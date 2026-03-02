@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: owlwatch
+      POSTGRES_PASSWORD: owlwatch123
+      POSTGRES_DB: owlwatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://owlwatch:owlwatch123@postgres:5432/owlwatch
+      REDIS_URL: redis://redis:6379/0
+      BOCHA_API_KEY: ${BOCHA_API_KEY}
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      ANSPIRE_API_KEY: ${ANSPIRE_API_KEY}
+      BAILIAN_API_KEY: ${BAILIAN_API_KEY}
+      JWT_SECRET: your-super-secret-key-change-in-production
+      JWT_ALGORITHM: HS256
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+
+volumes:
+  postgres_data:
+  redis_data:
