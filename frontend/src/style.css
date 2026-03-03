@@ -385,12 +385,70 @@ h3 { font-size: 1.25rem; }
   color: var(--text-muted) !important;
 }
 
-/* Select */
+/* Select - Full Override with CSS Variables */
+.el-select {
+  --el-select-input-focus-border-color: var(--neon-cyan) !important;
+  --el-select-border-color-hover: var(--neon-cyan) !important;
+  --el-select-border-color: var(--border-color) !important;
+  --el-fill-color-blank: transparent !important;
+  --el-bg-color: transparent !important;
+  --el-bg-color-overlay: transparent !important;
+  --el-input-bg-color: var(--bg-tertiary) !important;
+  --el-input-border-color: var(--border-color) !important;
+  --el-input-hover-border-color: var(--neon-cyan) !important;
+  --el-input-focus-border-color: var(--neon-cyan) !important;
+  --el-input-text-color: var(--text-primary) !important;
+  --el-input-placeholder-color: var(--text-muted) !important;
+  --el-text-color-regular: var(--text-primary) !important;
+}
+
 .el-select .el-input__wrapper {
+  background-color: var(--bg-tertiary) !important;
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+.el-select .el-input__wrapper:hover {
+  border-color: var(--neon-cyan) !important;
+}
+
+.el-select .el-input__wrapper.is-focus {
+  border-color: var(--neon-cyan) !important;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
+}
+
+.el-select .el-input__inner {
+  color: var(--text-primary) !important;
+  background-color: transparent !important;
+}
+
+.el-select .el-input__inner::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.el-select .el-select__caret {
+  color: var(--text-secondary) !important;
+}
+
+.el-select .el-select__clear {
+  color: var(--text-secondary) !important;
+}
+
+/* Cyber Select Custom Class */
+.cyber-select {
+  width: 160px;
+}
+
+.cyber-select .el-input__wrapper {
+  background-color: var(--bg-tertiary) !important;
   background: var(--bg-tertiary) !important;
 }
 
-.el-select-dropdown {
+/* Select Dropdown - Teleported to body */
+.el-select-dropdown,
+.el-select__popper {
+  background-color: var(--bg-secondary) !important;
   background: var(--bg-secondary) !important;
   border: 1px solid var(--border-color) !important;
   backdrop-filter: blur(10px);
@@ -398,15 +456,35 @@ h3 { font-size: 1.25rem; }
 
 .el-select-dropdown__item {
   color: var(--text-primary) !important;
+  background-color: transparent !important;
 }
 
 .el-select-dropdown__item.hover,
 .el-select-dropdown__item:hover {
+  background-color: rgba(0, 240, 255, 0.1) !important;
   background: rgba(0, 240, 255, 0.1) !important;
 }
 
 .el-select-dropdown__item.selected {
   color: var(--neon-cyan) !important;
+}
+
+.el-select-dropdown__item.is-disabled {
+  color: var(--text-muted) !important;
+}
+
+/* Popper (for select dropdown teleported to body) */
+.el-popper.is-light,
+.el-popper.is-pure {
+  background-color: var(--bg-secondary) !important;
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-popper.is-light .el-popper__arrow::before,
+.el-popper.is-pure .el-popper__arrow::before {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
 }
 
 /* Dialog */
