@@ -100,7 +100,13 @@ async def run_collect_task(
     negative_mode: bool
 ):
     """后台执行采集任务"""
+    # Windows 上设置事件循环策略以支持 Playwright
+    import sys
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
     db = SessionLocal()
+    task_collectors = {}  # 本任务使用的采集器实例（用于清理）
     try:
         collect_tasks[task_id]["status"] = "running"
 
@@ -138,6 +144,9 @@ async def run_collect_task(
         logger.info(f"[Task {task_id}] Search keywords: {search_keywords}")
         logger.info(f"[Task {task_id}] Platforms: {platforms}, Negative mode: {negative_mode}")
 
+        # 为本任务创建独立的采集器实例（避免并发冲突）
+        task_collectors = {}  # platform -> collector instance
+
         for platform in platforms:
             collector_func = collector_map.get(platform)
             if not collector_func:
@@ -148,7 +157,10 @@ async def run_collect_task(
                 logger.warning(f"Collector not available: {platform}")
                 continue
 
-            # 多轮搜索
+            # 保存采集器实例，用于后续清理
+            task_collectors[platform] = collector
+
+            # 多轮搜索（使用同一个采集器实例）
             for search_keyword in search_keywords:
                 try:
                     request = CollectRequest(
@@ -164,13 +176,13 @@ async def run_collect_task(
                         seen_urls.add(item.url)
 
                     results.extend(new_items)
-                    logger.info(f"[{platform}] Search '{search_keyword}': {len(new_items)} new items")
+                    logger.info(f"[Task {task_id}][{platform}] Search '{search_keyword}': {len(new_items)} new items")
 
                     # 更新进度
                     collect_tasks[task_id]["message"] = f"正在搜索: {search_keyword[:20]}..."
 
                 except Exception as e:
-                    logger.error(f"Collect error [{platform}] '{search_keyword}': {e}")
+                    logger.error(f"[Task {task_id}] Collect error [{platform}] '{search_keyword}': {e}")
                     continue
 
         # 保存结果到数据库
@@ -180,9 +192,9 @@ async def run_collect_task(
         max_deep_fetch = 10  # 限制深度抓取数量
         sentiment_analyzer = get_sentiment_analyzer()
 
-        # 获取百度采集器（用于深度抓取）
-        baidu_collector = get_baidu_collector()
-        bing_collector = get_bing_collector()
+        # 使用本任务的采集器进行深度抓取
+        baidu_collector = task_collectors.get("baidu")
+        bing_collector = task_collectors.get("bing")
 
         logger.info(f"[Task {task_id}] Processing {len(results)} results...")
 
@@ -292,7 +304,14 @@ async def run_collect_task(
         collect_tasks[task_id]["finished_at"] = datetime.utcnow().isoformat()
     finally:
         db.close()
-        # 浏览器采集器由线程池管理，无需手动关闭
+        # 关闭本任务创建的所有浏览器采集器
+        for platform, collector in task_collectors.items():
+            if platform in ["baidu", "bing"] and hasattr(collector, 'close'):
+                try:
+                    await collector.close()
+                    logger.debug(f"[Task {task_id}] Closed {platform} collector")
+                except Exception as e:
+                    logger.debug(f"[Task {task_id}] Close {platform} collector error: {e}")
 
 
 @router.post("/trigger", response_model=CollectTriggerResponse)
