@@ -10,10 +10,11 @@ import {
   GridComponent,
 } from 'echarts/components'
 import VChart from 'vue-echarts'
-import 'echarts-wordcloud'
+import { PieChart as PieIcon, DataLine } from '@element-plus/icons-vue'
 import { keywordsApi, articlesApi, alertsApi } from '@/api'
 import type { TrendPoint, WordFrequency, SourceDistribution } from '@/api/articles'
 
+// 注册 ECharts 组件
 use([
   CanvasRenderer,
   PieChart,
@@ -25,7 +26,6 @@ use([
   GridComponent,
 ])
 
-// 统计数据
 const stats = ref({
   keywords: 0,
   articles: 0,
@@ -37,23 +37,13 @@ const stats = ref({
   negativeRatio: 0,
 })
 
-// 趋势数据
 const trendData = ref<TrendPoint[]>([])
-
-// 来源分布
 const sourceData = ref<SourceDistribution[]>([])
-
-// 词云数据
 const wordData = ref<WordFrequency[]>([])
-
-// 加载状态
 const loading = ref(true)
 const trendLoading = ref(false)
-
-// 趋势天数
 const trendDays = ref(7)
 
-// 获取统计数据
 const fetchStats = async () => {
   loading.value = true
   try {
@@ -80,7 +70,6 @@ const fetchStats = async () => {
   }
 }
 
-// 获取趋势数据
 const fetchTrend = async () => {
   trendLoading.value = true
   try {
@@ -93,7 +82,6 @@ const fetchTrend = async () => {
   }
 }
 
-// 获取来源分布
 const fetchSources = async () => {
   try {
     sourceData.value = await articlesApi.getSources(undefined, 8)
@@ -102,7 +90,6 @@ const fetchSources = async () => {
   }
 }
 
-// 获取词云数据
 const fetchWords = async () => {
   try {
     wordData.value = await articlesApi.getWords(7, undefined, 80)
@@ -111,92 +98,164 @@ const fetchWords = async () => {
   }
 }
 
-// 情感分布图表配置
+const handleDaysChange = () => {
+  fetchTrend()
+}
+
+// Stat cards config
+const statCards = computed(() => [
+  {
+    key: 'keywords',
+    value: stats.value.keywords,
+    label: '监控主体',
+    icon: 'Key',
+    color: '#00f0ff',
+    trend: '+2',
+  },
+  {
+    key: 'articles',
+    value: stats.value.articles,
+    label: '情报总量',
+    icon: 'Document',
+    color: '#00ff88',
+    trend: '+15%',
+  },
+  {
+    key: 'today',
+    value: stats.value.today,
+    label: '今日采集',
+    icon: 'Calendar',
+    color: '#a855f7',
+    trend: null,
+  },
+  {
+    key: 'week',
+    value: stats.value.week,
+    label: '本周采集',
+    icon: 'TrendCharts',
+    color: '#ffd000',
+    trend: null,
+  },
+  {
+    key: 'alerts',
+    value: stats.value.alerts,
+    label: '预警总数',
+    icon: 'Bell',
+    color: '#ff6b2c',
+    trend: null,
+  },
+  {
+    key: 'pendingAlerts',
+    value: stats.value.pendingAlerts,
+    label: '待处理',
+    icon: 'Warning',
+    color: '#ff3366',
+    trend: stats.value.pendingAlerts > 0 ? '!' : null,
+  },
+])
+
+// Chart options with cyberpunk theme
 const sentimentOption = computed(() => ({
   tooltip: {
     trigger: 'item',
-    formatter: '{b}: {c} ({d}%)',
+    backgroundColor: 'rgba(15, 21, 32, 0.95)',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    textStyle: { color: '#e4e8f1' },
   },
   legend: {
     bottom: '5%',
     left: 'center',
+    textStyle: { color: '#8b95a8' },
   },
   series: [
     {
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['45%', '75%'],
       avoidLabelOverlap: false,
       itemStyle: {
-        borderRadius: 10,
-        borderColor: '#fff',
-        borderWidth: 2,
+        borderRadius: 6,
+        borderColor: '#0a0e17',
+        borderWidth: 3,
       },
-      label: {
-        show: false,
-      },
+      label: { show: false },
       emphasis: {
         label: {
           show: true,
           fontSize: 14,
           fontWeight: 'bold',
+          color: '#e4e8f1',
         },
       },
       data: [
         {
           value: Math.round(stats.value.positiveRatio * stats.value.articles),
           name: '正面',
-          itemStyle: { color: '#67c23a' },
+          itemStyle: { color: '#00ff88' },
         },
         {
           value: Math.round(stats.value.negativeRatio * stats.value.articles),
           name: '负面',
-          itemStyle: { color: '#f56c6c' },
+          itemStyle: { color: '#ff3366' },
         },
         {
           value: Math.round((1 - stats.value.positiveRatio - stats.value.negativeRatio) * stats.value.articles),
           name: '中性',
-          itemStyle: { color: '#909399' },
+          itemStyle: { color: '#4a5568' },
         },
       ],
     },
   ],
 }))
 
-// 趋势图表配置
 const trendOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
-    axisPointer: { type: 'cross' },
+    backgroundColor: 'rgba(15, 21, 32, 0.95)',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    textStyle: { color: '#e4e8f1' },
+    axisPointer: {
+      type: 'cross',
+      lineStyle: { color: 'rgba(0, 240, 255, 0.3)' },
+    },
   },
   legend: {
-    data: ['文章数', '正面', '负面'],
+    data: ['情报量', '正面', '负面'],
     bottom: 0,
+    textStyle: { color: '#8b95a8' },
   },
   grid: {
     left: '3%',
     right: '4%',
     bottom: '15%',
+    top: '10%',
     containLabel: true,
   },
   xAxis: {
     type: 'category',
-    data: trendData.value.map((d) => d.date.slice(5)), // 只显示月-日
+    data: trendData.value.map((d) => d.date.slice(5)),
+    axisLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.2)' } },
+    axisLabel: { color: '#8b95a8' },
   },
-  yAxis: { type: 'value' },
+  yAxis: {
+    type: 'value',
+    splitLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.1)' } },
+    axisLabel: { color: '#8b95a8' },
+  },
   series: [
     {
-      name: '文章数',
+      name: '情报量',
       type: 'line',
       smooth: true,
       data: trendData.value.map((d) => d.count),
-      itemStyle: { color: '#409eff' },
+      lineStyle: { color: '#00f0ff', width: 3 },
+      itemStyle: { color: '#00f0ff' },
       areaStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(64,158,255,0.3)' },
-            { offset: 1, color: 'rgba(64,158,255,0.05)' },
+            { offset: 0, color: 'rgba(0, 240, 255, 0.4)' },
+            { offset: 1, color: 'rgba(0, 240, 255, 0.02)' },
           ],
         },
       },
@@ -206,34 +265,45 @@ const trendOption = computed(() => ({
       type: 'line',
       smooth: true,
       data: trendData.value.map((d) => d.positive),
-      itemStyle: { color: '#67c23a' },
+      lineStyle: { color: '#00ff88', width: 2 },
+      itemStyle: { color: '#00ff88' },
     },
     {
       name: '负面',
       type: 'line',
       smooth: true,
       data: trendData.value.map((d) => d.negative),
-      itemStyle: { color: '#f56c6c' },
+      lineStyle: { color: '#ff3366', width: 2 },
+      itemStyle: { color: '#ff3366' },
     },
   ],
 }))
 
-// 来源分布图表配置
 const sourceOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
+    backgroundColor: 'rgba(15, 21, 32, 0.95)',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    textStyle: { color: '#e4e8f1' },
     axisPointer: { type: 'shadow' },
   },
   grid: {
     left: '3%',
-    right: '4%',
+    right: '8%',
     bottom: '3%',
+    top: '3%',
     containLabel: true,
   },
-  xAxis: { type: 'value' },
+  xAxis: {
+    type: 'value',
+    splitLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.1)' } },
+    axisLabel: { color: '#8b95a8' },
+  },
   yAxis: {
     type: 'category',
     data: sourceData.value.map((d) => d.source).reverse(),
+    axisLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.2)' } },
+    axisLabel: { color: '#8b95a8' },
   },
   series: [
     {
@@ -244,51 +314,64 @@ const sourceOption = computed(() => ({
           type: 'linear',
           x: 0, y: 0, x2: 1, y2: 0,
           colorStops: [
-            { offset: 0, color: '#409eff' },
-            { offset: 1, color: '#67c23a' },
+            { offset: 0, color: '#00f0ff' },
+            { offset: 1, color: '#ff6b2c' },
           ],
         },
         borderRadius: [0, 4, 4, 0],
       },
+      barWidth: 12,
     },
   ],
 }))
 
-// 词云配置
-const wordCloudOption = computed(() => {
-  const colors = ['#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399']
-  return {
-    series: [
-      {
-        type: 'wordCloud',
-        shape: 'circle',
-        left: 'center',
-        top: 'center',
-        width: '90%',
-        height: '90%',
-        sizeRange: [14, 48],
-        rotationRange: [-45, 45],
-        rotationStep: 15,
-        gridSize: 8,
-        drawOutOfBound: false,
-        textStyle: {
-          fontFamily: 'sans-serif',
-          fontWeight: 'bold',
-          color: () => colors[Math.floor(Math.random() * colors.length)],
+// 词云配置 - 使用简单的柱状图代替
+const wordBarOption = computed(() => ({
+  tooltip: {
+    trigger: 'axis',
+    backgroundColor: 'rgba(15, 21, 32, 0.95)',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    textStyle: { color: '#e4e8f1' },
+    axisPointer: { type: 'shadow' },
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    top: '3%',
+    containLabel: true,
+  },
+  xAxis: {
+    type: 'value',
+    splitLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.1)' } },
+    axisLabel: { color: '#8b95a8' },
+  },
+  yAxis: {
+    type: 'category',
+    data: wordData.value.slice(0, 10).map((w) => w.word),
+    axisLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.2)' } },
+    axisLabel: { color: '#8b95a8' },
+  },
+  series: [
+    {
+      type: 'bar',
+      data: wordData.value.slice(0, 10).map((w) => w.count),
+      itemStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 1, y2: 0,
+          colorStops: [
+            { offset: 0, color: '#00f0ff' },
+            { offset: 0.5, color: '#a855f7' },
+            { offset: 1, color: '#ff6b2c' },
+          ],
         },
-        data: wordData.value.map((w) => ({
-          name: w.word,
-          value: w.count,
-        })),
+        borderRadius: [0, 4, 4, 0],
       },
-    ],
-  }
-})
-
-// 监听天数变化
-const handleDaysChange = () => {
-  fetchTrend()
-}
+      barWidth: 16,
+    },
+  ],
+}))
 
 onMounted(async () => {
   await Promise.all([
@@ -302,262 +385,447 @@ onMounted(async () => {
 
 <template>
   <div class="dashboard" v-loading="loading">
-    <!-- 统计卡片 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :xs="12" :sm="8" :md="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #409eff">
-              <el-icon :size="24"><Key /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.keywords }}</div>
-              <div class="stat-label">监控主体</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :md="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #67c23a">
-              <el-icon :size="24"><Document /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.articles }}</div>
-              <div class="stat-label">文章总数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :md="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #00d4aa">
-              <el-icon :size="24"><Calendar /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.today }}</div>
-              <div class="stat-label">今日采集</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :md="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #e6a23c">
-              <el-icon :size="24"><Bell /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.alerts }}</div>
-              <div class="stat-label">预警总数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :md="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #f56c6c">
-              <el-icon :size="24"><Warning /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stats.pendingAlerts }}</div>
-              <div class="stat-label">待处理预警</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :md="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-icon" style="background: #8b5cf6">
-              <el-icon :size="24"><TrendCharts /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ (stats.negativeRatio * 100).toFixed(1) }}%</div>
-              <div class="stat-label">负面占比</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div
+        v-for="(card, index) in statCards"
+        :key="card.key"
+        class="stat-card cyber-card fade-in-up"
+        :class="`stagger-${index + 1}`"
+        :style="{ '--card-color': card.color }"
+      >
+        <div class="stat-icon">
+          <el-icon :size="28"><component :is="card.icon" /></el-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value data-value">{{ card.value }}</div>
+          <div class="stat-label">{{ card.label }}</div>
+        </div>
+        <div class="stat-trend" v-if="card.trend" :class="{ warning: card.trend === '!' }">
+          {{ card.trend }}
+        </div>
+        <div class="stat-glow"></div>
+      </div>
+    </div>
 
-    <!-- 图表区域 - 第一行 -->
-    <el-row :gutter="20">
-      <el-col :xs="24" :lg="16">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span class="card-title">舆情趋势</span>
-              <el-radio-group v-model="trendDays" size="small" @change="handleDaysChange">
-                <el-radio-button :value="7">7天</el-radio-button>
-                <el-radio-button :value="14">14天</el-radio-button>
-                <el-radio-button :value="30">30天</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
+    <!-- Charts Row 1 -->
+    <div class="charts-row">
+      <div class="chart-container chart-large cyber-card fade-in-up stagger-3">
+        <div class="chart-header">
+          <div class="chart-title">
+            <span class="title-decorator">◈</span>
+            舆情趋势分析
+          </div>
+          <div class="chart-actions">
+            <button
+              v-for="days in [7, 14, 30]"
+              :key="days"
+              class="time-btn"
+              :class="{ active: trendDays === days }"
+              @click="trendDays = days; handleDaysChange()"
+            >
+              {{ days }}天
+            </button>
+          </div>
+        </div>
+        <div class="chart-body">
           <v-chart
             v-if="trendData.length > 0"
-            class="chart chart-large"
+            class="chart"
             :option="trendOption"
             :loading="trendLoading"
             autoresize
           />
-          <el-empty v-else description="暂无趋势数据" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="8">
-        <el-card class="chart-card">
-          <template #header>
-            <span class="card-title">情感分布</span>
-          </template>
+          <div v-else class="empty-state">
+            <el-icon :size="48"><TrendCharts /></el-icon>
+            <span>暂无趋势数据</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container cyber-card fade-in-up stagger-4">
+        <div class="chart-header">
+          <div class="chart-title">
+            <span class="title-decorator">◈</span>
+            情感分布
+          </div>
+        </div>
+        <div class="chart-body">
           <v-chart
             v-if="stats.articles > 0"
             class="chart"
             :option="sentimentOption"
             autoresize
           />
-          <el-empty v-else description="暂无数据" />
-        </el-card>
-      </el-col>
-    </el-row>
+          <div v-else class="empty-state">
+            <el-icon :size="48"><PieIcon /></el-icon>
+            <span>暂无数据</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <!-- 图表区域 - 第二行 -->
-    <el-row :gutter="20" class="mt-20">
-      <el-col :xs="24" :lg="12">
-        <el-card class="chart-card">
-          <template #header>
-            <span class="card-title">来源分布</span>
-          </template>
+    <!-- Charts Row 2 -->
+    <div class="charts-row">
+      <div class="chart-container cyber-card fade-in-up stagger-5">
+        <div class="chart-header">
+          <div class="chart-title">
+            <span class="title-decorator">◈</span>
+            来源分布
+          </div>
+        </div>
+        <div class="chart-body">
           <v-chart
             v-if="sourceData.length > 0"
             class="chart"
             :option="sourceOption"
             autoresize
           />
-          <el-empty v-else description="暂无数据" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card class="chart-card">
-          <template #header>
-            <span class="card-title">热词云</span>
-          </template>
+          <div v-else class="empty-state">
+            <el-icon :size="48"><DataLine /></el-icon>
+            <span>暂无数据</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container cyber-card fade-in-up stagger-6">
+        <div class="chart-header">
+          <div class="chart-title">
+            <span class="title-decorator">◈</span>
+            热词排行
+          </div>
+        </div>
+        <div class="chart-body">
           <v-chart
             v-if="wordData.length > 0"
             class="chart"
-            :option="wordCloudOption"
+            :option="wordBarOption"
             autoresize
           />
-          <el-empty v-else description="暂无数据" />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 快速操作 -->
-    <el-row :gutter="20" class="mt-20">
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <span class="card-title">快速操作</span>
-          </template>
-          <div class="quick-actions">
-            <el-button type="primary" @click="$router.push('/keywords')">
-              <el-icon><Plus /></el-icon>
-              添加关键词
-            </el-button>
-            <el-button type="warning" @click="$router.push('/alerts')">
-              <el-icon><Bell /></el-icon>
-              查看预警
-            </el-button>
-            <el-button @click="$router.push('/articles')">
-              <el-icon><Document /></el-icon>
-              浏览文章
-            </el-button>
+          <div v-else class="empty-state">
+            <el-icon :size="48"><Histogram /></el-icon>
+            <span>暂无数据</span>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions cyber-card fade-in-up stagger-6">
+      <div class="chart-header">
+        <div class="chart-title">
+          <span class="title-decorator">◈</span>
+          快速操作
+        </div>
+      </div>
+      <div class="actions-grid">
+        <button class="action-btn action-primary" @click="$router.push('/keywords')">
+          <el-icon :size="24"><Plus /></el-icon>
+          <span>添加监控主体</span>
+        </button>
+        <button class="action-btn action-warning" @click="$router.push('/alerts')">
+          <el-icon :size="24"><Bell /></el-icon>
+          <span>查看预警</span>
+          <span v-if="stats.pendingAlerts > 0" class="badge">{{ stats.pendingAlerts }}</span>
+        </button>
+        <button class="action-btn action-default" @click="$router.push('/articles')">
+          <el-icon :size="24"><Document /></el-icon>
+          <span>浏览情报库</span>
+        </button>
+        <button class="action-btn action-default" @click="$router.push('/negative-keywords')">
+          <el-icon :size="24"><Warning /></el-icon>
+          <span>负面词库</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .dashboard {
-  padding: 0;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
-.stats-row {
-  margin-bottom: 20px;
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
-  margin-bottom: 20px;
-}
-
-.stat-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
 .stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(0, 240, 255, 0.05));
+  border: 1px solid var(--card-color);
+  border-radius: 12px;
+  color: var(--card-color);
+  flex-shrink: 0;
+  position: relative;
 }
 
-.stat-info {
+.stat-icon::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--card-color), transparent);
+  opacity: 0.1;
+}
+
+.stat-content {
   flex: 1;
+  min-width: 0;
 }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
 }
 
-.chart-card {
+.stat-trend {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--neon-green);
+  padding: 2px 8px;
+  background: rgba(0, 255, 136, 0.1);
+  border-radius: 4px;
+}
+
+.stat-trend.warning {
+  color: var(--neon-red);
+  background: rgba(255, 51, 102, 0.1);
+  animation: pulse-glow 1s infinite;
+}
+
+.stat-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--card-color), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.stat-card:hover .stat-glow {
+  opacity: 1;
+}
+
+/* Charts */
+.charts-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
   margin-bottom: 20px;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.card-title {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.chart {
-  height: 280px;
+.chart-container {
+  overflow: hidden;
 }
 
 .chart-large {
+  grid-column: span 1;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.chart-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-decorator {
+  color: var(--neon-cyan);
+  font-size: 0.7rem;
+}
+
+.chart-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.time-btn {
+  padding: 6px 14px;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.time-btn:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.time-btn.active {
+  background: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  color: var(--bg-primary);
+}
+
+.chart-body {
+  padding: 16px;
   height: 320px;
 }
 
-.mt-20 {
-  margin-top: 0;
+.chart {
+  width: 100%;
+  height: 100%;
 }
 
-.quick-actions {
+.empty-state {
+  height: 100%;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
+  color: var(--text-muted);
+}
+
+/* Quick Actions */
+.quick-actions {
+  margin-top: 4px;
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.action-btn span {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.action-btn:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  transform: translateY(-2px);
+}
+
+.action-btn.action-primary {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(0, 240, 255, 0.05));
+  border-color: rgba(0, 240, 255, 0.3);
+  color: var(--neon-cyan);
+}
+
+.action-btn.action-primary:hover {
+  box-shadow: var(--glow-cyan);
+}
+
+.action-btn.action-warning {
+  background: linear-gradient(135deg, rgba(255, 107, 44, 0.15), rgba(255, 107, 44, 0.05));
+  border-color: rgba(255, 107, 44, 0.3);
+  color: var(--neon-orange);
+}
+
+.action-btn.action-warning:hover {
+  box-shadow: var(--glow-orange);
+}
+
+.badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: var(--neon-red);
+  color: white;
+  border-radius: 10px;
+  padding: 0 6px;
+  animation: pulse-glow 2s infinite;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-large {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
