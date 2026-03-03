@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Windows 上必须在使用 Playwright 之前设置事件循环策略
-# 这必须在任何 asyncio 事件循环创建之前设置
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 

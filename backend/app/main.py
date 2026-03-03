@@ -1,10 +1,54 @@
 """FastAPI 主应用"""
 import asyncio
 import sys
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+from datetime import datetime
 
 # Windows 上需要设置事件循环策略以支持子进程
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+
+def _setup_file_logging():
+    """设置文件日志"""
+    # 检查是否已配置
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        if isinstance(handler, RotatingFileHandler):
+            return
+
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    log_file = os.path.join(log_dir, f"owlwatch_{today}.log")
+
+    log_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    root_logger.setLevel(logging.DEBUG)
+
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=7,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+    root_logger.addHandler(file_handler)
+
+    # 降低第三方库日志级别
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+_setup_file_logging()
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,10 +118,10 @@ async def startup_event():
         from .schedulers import start_scheduler
         # 启动调度器
         start_scheduler()
-    print("OwlWatch 舆情监控系统已启动")
+    logger.info("OwlWatch 舆情监控系统已启动")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
-    print("OwlWatch 舆情监控系统正在关闭...")
+    logger.info("OwlWatch 舆情监控系统正在关闭...")

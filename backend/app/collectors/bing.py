@@ -78,9 +78,33 @@ def _bing_page_content_worker(url: str) -> str:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
             page = context.new_page()
-            page.goto(url, timeout=30000, wait_until='domcontentloaded')
-            page.wait_for_timeout(1000)
-            content = page.content()
+
+            # 使用 networkidle 等待网络请求完成
+            try:
+                page.goto(url, timeout=30000, wait_until='networkidle')
+            except Exception:
+                # 如果 networkidle 超时，降级为 domcontentloaded
+                page.goto(url, timeout=30000, wait_until='domcontentloaded')
+
+            # 等待页面稳定
+            page.wait_for_load_state('domcontentloaded')
+            page.wait_for_timeout(2000)  # 额外等待JS执行完成
+
+            # 提取正文内容（优先获取article标签或主要内容区域）
+            try:
+                main_content = page.query_selector('article') or \
+                               page.query_selector('main') or \
+                               page.query_selector('.content') or \
+                               page.query_selector('#content') or \
+                               page.query_selector('body')
+
+                if main_content:
+                    content = main_content.inner_text()
+                else:
+                    content = page.content()
+            except Exception:
+                content = page.content()
+
             page.close()
             context.close()
             browser.close()

@@ -10,6 +10,28 @@ from .base import CollectResult, CollectRequest
 logger = logging.getLogger(__name__)
 
 
+def _resolve_redirect_url(page, baidu_url: str) -> str:
+    """解析百度重定向URL获取真实地址"""
+    if not baidu_url or 'baidu.com/link' not in baidu_url:
+        return baidu_url
+
+    try:
+        # 创建新页面解析重定向
+        redirect_page = page.context.new_page()
+        redirect_page.goto(baidu_url, timeout=10000, wait_until='domcontentloaded')
+        redirect_page.wait_for_timeout(1500)  # 等待重定向完成
+        real_url = redirect_page.url
+        redirect_page.close()
+
+        # 如果还是百度链接，说明重定向失败
+        if 'baidu.com' in real_url:
+            return baidu_url
+        return real_url
+    except Exception as e:
+        logger.debug(f"Failed to resolve redirect URL: {e}")
+        return baidu_url
+
+
 def _baidu_collect_worker(keyword: str, max_results: int) -> List[dict]:
     """在独立进程中执行采集"""
     from playwright.sync_api import sync_playwright
@@ -65,6 +87,9 @@ def _baidu_collect_worker(keyword: str, max_results: int) -> List[dict]:
                     link_el = item.query_selector('h3 a')
                     baidu_url = link_el.get_attribute('href') if link_el else ""
 
+                    # 解析百度重定向URL获取真实地址
+                    real_url = _resolve_redirect_url(page, baidu_url)
+
                     desc_el = item.query_selector('.c-abstract') or item.query_selector('.c-span9.c-color-text')
                     snippet = desc_el.inner_text() if desc_el else ""
 
@@ -75,7 +100,7 @@ def _baidu_collect_worker(keyword: str, max_results: int) -> List[dict]:
                         'keyword': keyword,
                         'title': title.strip(),
                         'content': snippet.strip(),
-                        'url': baidu_url,
+                        'url': real_url,  # 使用真实URL
                         'source': source.strip(),
                         'source_type': 'baidu',
                         'publish_time': datetime.utcnow().isoformat(),
@@ -104,9 +129,35 @@ def _baidu_page_content_worker(url: str) -> str:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
             page = context.new_page()
-            page.goto(url, timeout=30000, wait_until='domcontentloaded')
-            page.wait_for_timeout(1000)
-            content = page.content()
+
+            # 使用 networkidle 等待网络请求完成
+            try:
+                page.goto(url, timeout=30000, wait_until='networkidle')
+            except Exception:
+                # 如果 networkidle 超时，降级为 domcontentloaded
+                page.goto(url, timeout=30000, wait_until='domcontentloaded')
+
+            # 等待页面稳定
+            page.wait_for_load_state('domcontentloaded')
+            page.wait_for_timeout(2000)  # 额外等待JS执行完成
+
+            # 提取正文内容（优先获取article标签或主要内容区域）
+            try:
+                # 尝试获取主要内容区域
+                main_content = page.query_selector('article') or \
+                               page.query_selector('main') or \
+                               page.query_selector('.content') or \
+                               page.query_selector('#content') or \
+                               page.query_selector('body')
+
+                if main_content:
+                    # 获取文本内容，去除HTML标签
+                    content = main_content.inner_text()
+                else:
+                    content = page.content()
+            except Exception:
+                content = page.content()
+
             page.close()
             context.close()
             browser.close()

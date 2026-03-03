@@ -212,16 +212,36 @@ async def run_collect_task(
                 # 对于百度/Bing结果，尝试深度抓取页面内容
                 collector = baidu_collector or bing_collector
                 if collector and item.url:
+                    # 跳过百度重定向URL
+                    if 'baidu.com/link' in item.url:
+                        logger.debug(f"Skip deep fetch for Baidu redirect URL: {item.url[:50]}")
+                        filtered_count += 1
+                        continue
+
                     try:
                         deep_fetch_count += 1
                         page_content = await collector.collect_page_content(item.url)
-                        if keyword_text in page_content:
-                            # 更新内容为实际页面内容
-                            item.content = page_content[:5000]  # 限制长度
-                            snippet_match = True
-                            logger.info(f"Deep match found in page: {item.title[:30]}")
+
+                        # 检查内容有效性
+                        if page_content and len(page_content.strip()) > 100:
+                            if keyword_text in page_content:
+                                # 更新内容为实际页面内容
+                                item.content = page_content[:5000]  # 限制长度
+                                snippet_match = True
+                                logger.info(f"Deep match found in page: {item.title[:30]}")
+                            else:
+                                # 页面内容中没有关键词，过滤掉
+                                filtered_count += 1
+                                logger.debug(f"Filtered (deep fetch no match): {item.title[:30] if item.title else 'N/A'}")
+                                continue
+                        else:
+                            # 内容太短或为空，过滤掉
+                            filtered_count += 1
+                            continue
                     except Exception as e:
                         logger.debug(f"Deep fetch error: {e}")
+                        filtered_count += 1
+                        continue
 
             if not title_match and not snippet_match:
                 filtered_count += 1
@@ -241,13 +261,18 @@ async def run_collect_task(
             # AI 情感分析
             sentiment_score = None
             sentiment_label = None
-            if sentiment_analyzer and item.content:
+            if sentiment_analyzer and item.content and len(item.content.strip()) >= 10:
                 try:
                     analysis = await sentiment_analyzer.analyze(item.content)
                     sentiment_score = analysis.get("score")
                     sentiment_label = analysis.get("label")
+                    logger.debug(f"Sentiment analyzed for '{item.title[:30]}...': score={sentiment_score}, label={sentiment_label}")
                 except Exception as e:
                     logger.error(f"Sentiment analyze error: {e}")
+            elif not sentiment_analyzer:
+                logger.debug("Sentiment analyzer not available (bailian_api_key not configured)")
+            elif not item.content or len(item.content.strip()) < 10:
+                logger.debug(f"Skip sentiment analysis: content too short for '{item.title[:30] if item.title else 'N/A'}...")
 
             # 创建文章记录
             article = Article(

@@ -127,13 +127,37 @@ class AlertService:
         alert_type = "sensitive_keyword"
         rule = self.rules[alert_type]
 
+        # 检查最近已创建的敏感词预警，避免重复
+        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        existing_alerts = self.db.query(Alert).filter(
+            Alert.keyword_id == keyword.id,
+            Alert.alert_type == alert_type,
+            Alert.created_at >= one_hour_ago
+        ).all()
+
+        # 构建已预警的 article_id + word 组合集合
+        alerted_combinations = set()
+        for alert in existing_alerts:
+            if alert.article_id and alert.message:
+                # 从 message 中提取敏感词，格式: "检测到敏感词「xxx」"
+                import re
+                match = re.search(r'「(.+?)」', alert.message)
+                if match:
+                    word = match.group(1)
+                    alerted_combinations.add((alert.article_id, word))
+
         for article in articles:
             content = article.content or ""
             title = article.title or ""
 
             for word in self.SENSITIVE_WORDS:
                 if word in content or word in title:
-                    # 敏感词预警不检查冷却期，每次都发送
+                    # 检查是否已经预警过（同一文章+同一敏感词）
+                    combination = (article.id, word)
+                    if combination in alerted_combinations:
+                        logger.debug(f"Alert already exists for article {article.id} word '{word}'")
+                        continue
+
                     await self._create_alert(
                         keyword=keyword,
                         alert_type=alert_type,
@@ -141,6 +165,8 @@ class AlertService:
                         message=f"检测到敏感词「{word}」",
                         articles=[article.id]
                     )
+                    # 记录已预警的组合
+                    alerted_combinations.add(combination)
                     break
 
     async def _check_volume_spike(self, articles: List[Article], keyword: Keyword):
