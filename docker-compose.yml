@@ -1,38 +1,56 @@
-version: '3.8'
+# ============================================
+# OwlWatch 舆情监控系统 - Docker Compose
+# 使用方法: docker compose up -d
+# ============================================
 
 services:
-  # PostgreSQL 数据库
+  # ==================== PostgreSQL 数据库 ====================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: owlwatch-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-owlwatch}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-owlwatch123}
       POSTGRES_DB: ${POSTGRES_DB:-owlwatch}
+      TZ: Asia/Shanghai
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - owlwatch_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-owlwatch}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-owlwatch} -d ${POSTGRES_DB:-owlwatch}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-  # Redis 缓存
+  # ==================== Redis 缓存 ====================
   redis:
     image: redis:7-alpine
     container_name: owlwatch-redis
     restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    networks:
+      - owlwatch_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-  # 后端 API 服务
+  # ==================== 后端 API 服务 ====================
   backend:
     build:
       context: ./backend
@@ -47,6 +65,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       APP_ENV: production
       DEBUG: "false"
+      TZ: Asia/Shanghai
+    networks:
+      - owlwatch_network
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,20 +79,38 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
-  # 前端服务
+  # ==================== 前端服务 ====================
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: owlwatch-frontend
     restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
     ports:
       - "3080:80"
+    networks:
+      - owlwatch_network
     depends_on:
       backend:
         condition: service_healthy
 
+networks:
+  owlwatch_network:
+    driver: bridge
+
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local

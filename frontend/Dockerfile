@@ -1,10 +1,14 @@
-# OwlWatch Frontend Dockerfile
-# 多阶段构建 - Vue 3 + Vite
+# ============================================
+# OwlWatch 舆情监控系统 - 前端 Docker 镜像
+# ============================================
 
 # 阶段1: 构建阶段
-FROM node:20-alpine AS builder
+FROM docker.1ms.run/library/node:20-alpine AS builder
 
 WORKDIR /app
+
+# 设置 npm 淘宝镜像
+RUN npm config set registry https://registry.npmmirror.com
 
 # 复制 package 文件
 COPY package*.json ./
@@ -19,7 +23,10 @@ COPY . .
 RUN npm run build
 
 # 阶段2: 运行阶段 (使用 nginx 提供静态文件服务)
-FROM nginx:alpine AS runner
+FROM docker.1ms.run/library/nginx:alpine AS runner
+
+# 设置时区
+ENV TZ=Asia/Shanghai
 
 # 复制自定义 nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
