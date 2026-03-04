@@ -22,13 +22,11 @@ from app.collectors.baidu import BaiduCollector
 from app.collectors.base import CollectRequest
 from app.config import settings
 from app.analyzers.sentiment import SentimentAnalyzer
+from app.services.redis_service import get_task_store
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# 采集任务状态存储（生产环境应使用 Redis）
-collect_tasks = {}
 
 
 class CollectTriggerResponse(BaseModel):
@@ -107,8 +105,10 @@ async def run_collect_task(
 
     db = SessionLocal()
     task_collectors = {}  # 本任务使用的采集器实例（用于清理）
+    task_store = await get_task_store()
+
     try:
-        collect_tasks[task_id]["status"] = "running"
+        await task_store.update(task_id, {"status": "running"})
 
         results = []
         seen_urls = set()  # 去重
@@ -179,7 +179,7 @@ async def run_collect_task(
                     logger.info(f"[Task {task_id}][{platform}] Search '{search_keyword}': {len(new_items)} new items")
 
                     # 更新进度
-                    collect_tasks[task_id]["message"] = f"正在搜索: {search_keyword[:20]}..."
+                    await task_store.update(task_id, {"message": f"正在搜索: {search_keyword[:20]}..."})
 
                 except Exception as e:
                     logger.error(f"[Task {task_id}] Collect error [{platform}] '{search_keyword}': {e}")
@@ -201,7 +201,7 @@ async def run_collect_task(
         for idx, item in enumerate(results):
             # 更新进度
             if idx % 5 == 0:
-                collect_tasks[task_id]["message"] = f"处理中: {idx+1}/{len(results)}"
+                await task_store.update(task_id, {"message": f"处理中: {idx+1}/{len(results)}"})
 
             # 严格过滤：标题或摘要必须精确包含关键词
             title_match = keyword_text in (item.title or "")
@@ -325,16 +325,20 @@ async def run_collect_task(
             logger.error(f"Alert check error: {e}")
 
         # 更新任务状态
-        collect_tasks[task_id]["status"] = "completed"
-        collect_tasks[task_id]["collected_count"] = saved_count
-        collect_tasks[task_id]["finished_at"] = datetime.utcnow().isoformat()
-        collect_tasks[task_id]["message"] = f"采集完成，新增 {saved_count} 条文章"
+        await task_store.update(task_id, {
+            "status": "completed",
+            "collected_count": saved_count,
+            "finished_at": datetime.utcnow().isoformat(),
+            "message": f"采集完成，新增 {saved_count} 条文章"
+        })
 
     except Exception as e:
         logger.error(f"Collect task failed: {e}")
-        collect_tasks[task_id]["status"] = "failed"
-        collect_tasks[task_id]["message"] = str(e)
-        collect_tasks[task_id]["finished_at"] = datetime.utcnow().isoformat()
+        await task_store.update(task_id, {
+            "status": "failed",
+            "message": str(e),
+            "finished_at": datetime.utcnow().isoformat()
+        })
     finally:
         db.close()
         # 关闭本任务创建的所有浏览器采集器
@@ -361,9 +365,10 @@ async def trigger_collect(
     if not keyword:
         raise HTTPException(status_code=404, detail="Keyword not found")
 
-    # 创建任务
+    # 创建任务（存储到 Redis）
     task_id = str(uuid.uuid4())
-    collect_tasks[task_id] = {
+    task_store = await get_task_store()
+    await task_store.create(task_id, {
         "task_id": task_id,
         "keyword_id": keyword_id,
         "keyword": keyword.keyword,
@@ -372,7 +377,7 @@ async def trigger_collect(
         "message": "任务已创建，等待执行",
         "created_at": datetime.utcnow().isoformat(),
         "finished_at": None,
-    }
+    })
 
     # 添加后台任务
     background_tasks.add_task(
@@ -395,10 +400,12 @@ async def trigger_collect(
 @router.get("/status/{task_id}", response_model=CollectStatusResponse)
 async def get_collect_status(task_id: str):
     """查询采集任务状态"""
-    if task_id not in collect_tasks:
+    task_store = await get_task_store()
+    task = await task_store.get(task_id)
+
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    task = collect_tasks[task_id]
     return CollectStatusResponse(
         task_id=task["task_id"],
         keyword=task["keyword"],
@@ -413,18 +420,8 @@ async def get_collect_status(task_id: str):
 @router.get("/running")
 async def get_running_tasks():
     """获取所有正在运行的任务"""
-    running = []
-    for task_id, task in collect_tasks.items():
-        if task["status"] in ["pending", "running"]:
-            running.append({
-                "task_id": task["task_id"],
-                "keyword_id": task["keyword_id"],
-                "keyword": task["keyword"],
-                "status": task["status"],
-                "collected_count": task["collected_count"],
-                "message": task.get("message"),
-                "created_at": task["created_at"],
-            })
+    task_store = await get_task_store()
+    running = await task_store.get_all_running()
     return {"tasks": running}
 
 
@@ -432,11 +429,12 @@ async def get_running_tasks():
 async def trigger_collect_all(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """触发所有活跃关键词的采集"""
     keywords = db.query(Keyword).filter(Keyword.is_active == True).all()
+    task_store = await get_task_store()
 
     task_ids = []
     for keyword in keywords:
         task_id = str(uuid.uuid4())
-        collect_tasks[task_id] = {
+        await task_store.create(task_id, {
             "task_id": task_id,
             "keyword_id": keyword.id,
             "keyword": keyword.keyword,
@@ -445,7 +443,7 @@ async def trigger_collect_all(background_tasks: BackgroundTasks, db: Session = D
             "message": "任务已创建",
             "created_at": datetime.utcnow().isoformat(),
             "finished_at": None,
-        }
+        })
 
         background_tasks.add_task(
             run_collect_task,

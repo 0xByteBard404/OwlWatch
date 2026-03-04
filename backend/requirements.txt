@@ -7,14 +7,15 @@ apscheduler>=3.11.0
 pydantic>=2.11.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.1
-httpx>=0.28.2
+httpx>=0.27.0,<1.0.0  # HTTP 客户端（固定稳定版本）
 pydash>=7.4.3
 PyJWT>=2.8.0
+psycopg2-binary>=2.9.9  # PostgreSQL 驱动
 aiomysql>=0.2.0  # 异步 MySQL 驱动（如果需要）
 aiosqlite>=0.20.0  # 异步 SQLite 驱动
 aiosmtplib>=3.0.0  # 异步 SMTP 邮件发送
 jieba>=0.42.1  # 中文分词
-playwright>=1.40.0  # 浏览器自动化（Bing搜索）
+playwright>=1.40.0,<2.0.0  # 浏览器自动化（固定版本）
 
 # 测试依赖
 pytest>=8.3.5

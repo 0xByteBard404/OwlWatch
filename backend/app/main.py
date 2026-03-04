@@ -12,34 +12,44 @@ if sys.platform == 'win32':
 
 
 def _setup_file_logging():
-    """设置文件日志"""
+    """设置文件日志和控制台日志"""
     # 检查是否已配置
     root_logger = logging.getLogger()
     for handler in root_logger.handlers:
         if isinstance(handler, RotatingFileHandler):
             return
 
-    log_dir = "logs"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_file = os.path.join(log_dir, f"owlwatch_{today}.log")
-
     log_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
     root_logger.setLevel(logging.DEBUG)
 
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=7,
-        encoding='utf-8'
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
-    root_logger.addHandler(file_handler)
+    # 控制台日志（Docker 需要输出到 stdout）
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+    root_logger.addHandler(console_handler)
+
+    # 文件日志（仅在非 Docker 环境或目录可写时启用）
+    try:
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_file = os.path.join(log_dir, f"owlwatch_{today}.log")
+
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=7,
+            encoding='utf-8'
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+        root_logger.addHandler(file_handler)
+    except Exception as e:
+        # 文件日志创建失败时仅使用控制台日志
+        root_logger.warning(f"Failed to create log file: {e}")
 
     # 降低第三方库日志级别
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
@@ -118,10 +128,26 @@ async def startup_event():
         from .schedulers import start_scheduler
         # 启动调度器
         start_scheduler()
+
+    # 初始化 Redis 连接（用于任务状态存储）
+    try:
+        from .services.redis_service import get_redis
+        await get_redis()
+        logger.info("Redis 连接已初始化")
+    except Exception as e:
+        logger.warning(f"Redis 连接失败，任务状态将无法跨进程共享: {e}")
+
     logger.info("OwlWatch 舆情监控系统已启动")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
+    # 关闭 Redis 连接
+    try:
+        from .services.redis_service import close_redis
+        await close_redis()
+    except Exception as e:
+        logger.debug(f"关闭 Redis 连接时出错: {e}")
+
     logger.info("OwlWatch 舆情监控系统正在关闭...")
