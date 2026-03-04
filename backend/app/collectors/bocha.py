@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from .base import CollectResult, CollectRequest
+from .base import CollectResult, CollectRequest, extract_domain_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -72,14 +72,19 @@ class BochaCollector:
         web_pages = response.get("data", {}).get("webPages", {}).get("value", [])
 
         for item in web_pages:
+            url = item.get("url", "")
+            # 优先使用 siteName，如果为空则从 URL 提取域名
+            source = item.get("siteName") or extract_domain_from_url(url)
+
             results.append(CollectResult(
                 keyword=response.get("query", ""),
                 title=item.get("name", ""),
                 content=item.get("summary") or item.get("snippet", ""),
-                url=item.get("url", ""),
-                source=item.get("siteName", ""),
+                url=url,
+                source=source,
                 source_type=self.source_type,
-                publish_time=self._parse_time(item.get("dateLastCrawled")),
+                # 优先使用 datePublished（发布时间），fallback 到 dateLastCrawled（爬取时间）
+                publish_time=self._parse_time(item.get("datePublished") or item.get("dateLastCrawled")),
             ))
 
         return results

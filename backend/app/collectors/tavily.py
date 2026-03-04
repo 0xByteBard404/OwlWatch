@@ -4,8 +4,9 @@ import httpx
 import logging
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import urlparse
 
-from .base import CollectResult, CollectRequest
+from .base import CollectResult, CollectRequest, extract_domain_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +62,15 @@ class TavilyCollector:
         """解析 Tavily API 响应"""
         results = []
         for item in response.get("results", []):
+            url = item.get("url", "")
+            # 优先使用 source, 如果为空则从 URL 提取域名
+            source = item.get("source") or extract_domain_from_url(url)
             results.append(CollectResult(
                 keyword=response.get("query", ""),
                 title=item.get("title", ""),
                 content=item.get("content", ""),
-                url=item.get("url", ""),
-                source=item.get("source", ""),
+                url=url,
+                source=source,
                 source_type=self.source_type,
                 publish_time=self._parse_time(item.get("published_date")),
             ))

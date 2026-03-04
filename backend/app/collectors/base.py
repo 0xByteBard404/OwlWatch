@@ -3,6 +3,22 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from urllib.parse import urlparse
+
+
+def extract_domain_from_url(url: str) -> str:
+    """从 URL 中提取域名作为来源"""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc or parsed.path
+        # 移除 www. 前缀
+        if domain.startswith("www."):
+            domain = domain[4:]
+        return domain
+    except Exception:
+        return ""
 
 
 class CollectResult(BaseModel):

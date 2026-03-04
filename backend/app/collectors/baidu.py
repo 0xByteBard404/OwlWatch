@@ -2,10 +2,10 @@
 """百度搜索采集器（使用多进程避免 Windows asyncio 问题）"""
 import logging
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from urllib.parse import quote
 
-from .base import CollectResult, CollectRequest
+from .base import CollectResult, CollectRequest, extract_domain_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,9 @@ def _baidu_collect_worker(keyword: str, max_results: int) -> List[dict]:
 
                     source_el = item.query_selector('.c-showurl') or item.query_selector('.source_1Vdff')
                     source = source_el.inner_text() if source_el else ""
+                    # 如果来源为空，从真实URL提取域名
+                    if not source:
+                        source = extract_domain_from_url(real_url)
 
                     results.append({
                         'keyword': keyword,
@@ -120,9 +123,110 @@ def _baidu_collect_worker(keyword: str, max_results: int) -> List[dict]:
     return results
 
 
-def _baidu_page_content_worker(url: str) -> str:
-    """在独立进程中获取页面内容"""
+def _extract_publish_time_from_page(page) -> Optional[str]:
+    """从页面中提取发布时间"""
+    import re
+
+    try:
+        # 1. 尝试从 meta 标签获取发布时间
+        meta_selectors = [
+            'meta[property="article:published_time"]',
+            'meta[property="og:published_time"]',
+            'meta[property="article:published"]',
+            'meta[name="publishdate"]',
+            'meta[name="pubdate"]',
+            'meta[name="PublishDate"]',
+            'meta[name=" PubDate"]',
+            'meta[name="date"]',
+            'meta[itemprop="datePublished"]',
+        ]
+
+        for selector in meta_selectors:
+            try:
+                meta = page.query_selector(selector)
+                if meta:
+                    content = meta.get_attribute('content')
+                    if content:
+                        return content
+            except Exception:
+                continue
+
+        # 2. 尝试从 time 标签获取
+        time_el = page.query_selector('time[datetime]')
+        if time_el:
+            datetime_attr = time_el.get_attribute('datetime')
+            if datetime_attr:
+                return datetime_attr
+
+        # 3. 尝试从 JSON-LD 结构化数据获取
+        try:
+            json_ld_scripts = page.query_selector_all('script[type="application/ld+json"]')
+            for script in json_ld_scripts:
+                try:
+                    import json
+                    data = json.loads(script.inner_text())
+                    # 处理可能的列表格式
+                    if isinstance(data, list):
+                        data = data[0] if data else {}
+                    if isinstance(data, dict):
+                        date_published = data.get('datePublished') or data.get('dateCreated')
+                        if date_published:
+                            return date_published
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        # 4. 尝试从常见的时间 class 或 id 中获取
+        time_selectors = [
+            '.publish-time', '.pub-time', '.article-time',
+            '.post-date', '.article-date', '.news-date',
+            '#publish-time', '#pub-time', '#article-time',
+            '.date', '.time', '#date', '#time',
+            'span[class*="date"]', 'div[class*="date"]',
+        ]
+
+        for selector in time_selectors:
+            try:
+                el = page.query_selector(selector)
+                if el:
+                    text = el.inner_text().strip()
+                    # 验证是否是日期格式
+                    if _is_valid_date_text(text):
+                        return text
+            except Exception:
+                continue
+
+    except Exception as e:
+        logger.debug(f"[Extract publish time] Error: {e}")
+
+    return None
+
+
+def _is_valid_date_text(text: str) -> bool:
+    """检查文本是否可能是有效的日期"""
+    import re
+    if not text or len(text) > 100:
+        return False
+
+    # 常见日期格式正则
+    date_patterns = [
+        r'\d{4}[-/年]\d{1,2}[-/月]\d{1,2}',  # 2024-01-01, 2024/01/01, 2024年1月1日
+        r'\d{1,2}[-/]\d{1,2}[-/]\d{4}',      # 01-01-2024, 01/01/2024
+        r'\d{4}年\d{1,2}月\d{1,2}日',         # 中文格式
+    ]
+
+    for pattern in date_patterns:
+        if re.search(pattern, text):
+            return True
+    return False
+
+
+def _baidu_page_content_worker(url: str) -> dict:
+    """在独立进程中获取页面内容和发布时间"""
     from playwright.sync_api import sync_playwright
+
+    result = {'content': '', 'publish_time': None}
 
     try:
         with sync_playwright() as p:
@@ -141,6 +245,11 @@ def _baidu_page_content_worker(url: str) -> str:
             page.wait_for_load_state('domcontentloaded')
             page.wait_for_timeout(2000)  # 额外等待JS执行完成
 
+            # 提取发布时间
+            publish_time_str = _extract_publish_time_from_page(page)
+            if publish_time_str:
+                result['publish_time'] = _parse_publish_time(publish_time_str)
+
             # 提取正文内容（优先获取article标签或主要内容区域）
             try:
                 # 尝试获取主要内容区域
@@ -152,19 +261,53 @@ def _baidu_page_content_worker(url: str) -> str:
 
                 if main_content:
                     # 获取文本内容，去除HTML标签
-                    content = main_content.inner_text()
+                    result['content'] = main_content.inner_text()
                 else:
-                    content = page.content()
+                    result['content'] = page.content()
             except Exception:
-                content = page.content()
+                result['content'] = page.content()
 
             page.close()
             context.close()
             browser.close()
-            return content
     except Exception as e:
         logger.error(f"[Baidu] Get page content error: {e}")
-        return ""
+
+    return result
+
+
+def _parse_publish_time(time_str: str) -> Optional[str]:
+    """解析发布时间字符串，返回 ISO 格式"""
+    if not time_str:
+        return None
+
+    try:
+        # 尝试 ISO 格式
+        if 'T' in time_str:
+            clean_str = time_str.replace('Z', '').split('+')[0].split('.')[0]
+            return clean_str
+
+        # 处理中文日期格式：2024年1月1日
+        import re
+        cn_match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日', time_str)
+        if cn_match:
+            year, month, day = cn_match.groups()
+            return f"{year}-{int(month):02d}-{int(day):02d}"
+
+        # 处理斜杠格式：2024/01/01
+        if '/' in time_str:
+            parts = time_str.replace(' ', '-').split('/')
+            if len(parts) >= 3:
+                return f"{parts[0]}-{parts[1].zfill(2)}-{parts[2][:2].zfill(2)}"
+
+        # 处理横杠格式：2024-01-01
+        if '-' in time_str and len(time_str) >= 10:
+            return time_str[:10]
+
+    except Exception:
+        pass
+
+    return None
 
 
 class BaiduCollector:
@@ -204,8 +347,12 @@ class BaiduCollector:
 
         return results
 
-    async def collect_page_content(self, url: str) -> str:
-        """在独立进程中获取页面内容"""
+    async def collect_page_content(self, url: str) -> dict:
+        """在独立进程中获取页面内容和发布时间
+
+        Returns:
+            dict: {'content': str, 'publish_time': Optional[str]}
+        """
         import asyncio
 
         loop = asyncio.get_event_loop()

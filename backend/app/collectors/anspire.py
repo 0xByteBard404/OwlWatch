@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from .base import CollectResult, CollectRequest
+from .base import CollectResult, CollectRequest, extract_domain_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -61,13 +61,44 @@ class AnspireCollector:
         content = response.get("content", {})
 
         if content:
+            url = content.get("url", "")
+            # 优先使用 source, 如果为空则从 URL 提取域名
+            source = content.get("source") or extract_domain_from_url(url)
+            # 解析发布时间（可能存在于 published_date, publish_time, date 等字段）
+            publish_time = self._parse_time(
+                content.get("published_date")
+                or content.get("publish_time")
+                or content.get("date")
+                or content.get("publishedDate")
+            )
             results.append(CollectResult(
                 keyword="",
                 title=content.get("title", ""),
                 content=content.get("text", ""),
-                url=content.get("url", ""),
-                source=content.get("source", ""),
+                url=url,
+                source=source,
                 source_type=self.source_type,
+                publish_time=publish_time,
             ))
 
         return results
+
+    @staticmethod
+    def _parse_time(time_str: str) -> Optional[datetime]:
+        """解析时间字符串"""
+        if not time_str:
+            return None
+        try:
+            # 尝试 ISO 格式（最常见）
+            if "T" in time_str:
+                clean_str = time_str.replace("Z", "").split(".")[0]
+                return datetime.fromisoformat(clean_str)
+            # 尝试其他格式
+            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
+                try:
+                    return datetime.strptime(time_str, fmt)
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+        return None

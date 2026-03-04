@@ -220,7 +220,8 @@ async def run_collect_task(
 
                     try:
                         deep_fetch_count += 1
-                        page_content = await collector.collect_page_content(item.url)
+                        page_result = await collector.collect_page_content(item.url)
+                        page_content = page_result.get('content', '')
 
                         # 检查内容有效性
                         if page_content and len(page_content.strip()) > 100:
@@ -228,6 +229,13 @@ async def run_collect_task(
                                 # 更新内容为实际页面内容
                                 item.content = page_content[:5000]  # 限制长度
                                 snippet_match = True
+                                # 如果从页面提取到发布时间，更新 item
+                                if page_result.get('publish_time'):
+                                    try:
+                                        item.publish_time = datetime.fromisoformat(page_result['publish_time'])
+                                        logger.debug(f"Extracted publish_time: {page_result['publish_time']} for {item.title[:30]}")
+                                    except Exception:
+                                        pass
                                 logger.info(f"Deep match found in page: {item.title[:30]}")
                             else:
                                 # 页面内容中没有关键词，过滤掉
