@@ -1,6 +1,6 @@
 # OwlWatch 舆情监控系统
 
-基于 **Tavily**、**Anspire**、**Bocha** 三个搜索 API 和 **百炼 qwen3-max** 大模型的智能舆情监控平台。
+基于 **Bocha**、**Tavily**、**Anspire**、**百度**、**Bing** 多源数据采集和 **百炼 qwen3-max** 大模型的智能舆情监控平台。
 
 ## ✨ 功能特性
 
