@@ -3,7 +3,7 @@
 # ============================================
 
 # 阶段1: 构建阶段
-FROM docker.1ms.run/library/node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
