@@ -298,8 +298,8 @@ async def test_config(
     import httpx
     from app.config import settings
 
-    rsshub_url = getattr(settings, 'rsshub_url', 'http://rsshub:1200')
-
+    except Exception as e:
+        return {"success": False, "message": f"连接失败: {str(e)}"
     # 构建请求头，注入配置
     headers = {}
     if config.config_type == "cookie":
