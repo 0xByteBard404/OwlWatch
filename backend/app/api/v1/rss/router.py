@@ -112,9 +112,9 @@ class RSSHubConfigResponse(BaseModel):
 RSSHUB_CONFIG_TEMPLATES = {
     "wechat": {
         "display_name": "微信公众号",
-        "config_type": "param",
-        "description": "需要 biz 参数。获取方法：在公众号历史消息页面，复制链接中的 __biz 参数值（URL 编码后的字符串）",
-        "env_key": "WECHAT_MP_BIZ",
+        "config_type": "none",
+        "description": "不需要任何配置！推荐使用搜狗搜索，直接输入公众号名称即可订阅",
+        "env_key": "",
     },
     "weibo": {
         "display_name": "微博",
@@ -281,7 +281,7 @@ async def test_config(
 
     # 根据平台构建测试 URL
     test_urls = {
-        "wechat": "/wechat/mp/msgalbum/test",
+        "wechat": "/wechat/mp/msgalbum/MzU1MTE1MjU5Nw%3D%3D",
         "weibo": "/weibo/user/haoyunyizhou",
         "zhihu": "/zhihu/hotlist",
         "bilibili": "/bilibili/ranking/0/3",
@@ -564,7 +564,9 @@ RSSHUB_TEMPLATES = {
         "name": "微信公众号",
         "category": "资讯平台",
         "routes": [
-            {"path": "/wechat/mp/msgalbum/{biz}", "name": "公众号文章", "params": ["biz"], "help": "⚠️ 需要配置 Cookie。biz 获取：公众号历史消息链接中的 __biz 参数"},
+            {"path": "/wechat/sogou/{id}", "name": "搜狗搜索（推荐）", "params": ["id"], "help": "无需任何配置！直接输入公众号名称即可订阅，例如：人民日报、央视新闻"},
+            {"path": "/wechat/mp/msgalbum/{biz}/{aid}", "name": "公众号文章话题", "params": ["biz", "aid"], "help": "从公众号文章Tag链接获取：album_id=xxx，biz 和 aid 分别对应这两个值"},
+            {"path": "/wechat/mp/homepage/{biz}/{hid}", "name": "公众号栏目", "params": ["biz", "hid"], "help": "从公众号首页链接获取：__biz=xxx&hid=yyy"},
         ]
     },
     "toutiao": {
