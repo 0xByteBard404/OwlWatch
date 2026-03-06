@@ -3,12 +3,15 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 import uuid
+import json
+import os
 
 from app.dependencies import get_db
 from app.models.rss_feed import RSSFeed
+from app.models.rsshub_config import RSSHubConfig
 from app.schedulers.rss_scheduler import fetch_feed
 
 router = APIRouter()
@@ -69,7 +72,256 @@ class RSSHubURLBuild(BaseModel):
     params: dict = Field(default={}, description="参数")
 
 
-# ==================== Routes ====================
+# ==================== RSSHub 配置 Schemas ====================
+
+class RSSHubConfigCreate(BaseModel):
+    """创建 RSSHub 配置"""
+    platform: str = Field(..., description="平台标识")
+    display_name: str = Field(..., description="显示名称")
+    config_type: str = Field(default="cookie", description="配置类型: cookie/api_key/token/custom")
+    config_value: str = Field(..., description="配置值")
+    description: Optional[str] = Field(default=None, description="使用说明")
+
+
+class RSSHubConfigUpdate(BaseModel):
+    """更新 RSSHub 配置"""
+    display_name: Optional[str] = None
+    config_type: Optional[str] = None
+    config_value: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class RSSHubConfigResponse(BaseModel):
+    """RSSHub 配置响应"""
+    id: str
+    platform: str
+    display_name: str
+    config_type: str
+    config_value: str  # 前端显示时脱敏
+    description: Optional[str]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# RSSHub 平台配置模板（定义哪些平台需要什么配置）
+RSSHUB_CONFIG_TEMPLATES = {
+    "wechat": {
+        "display_name": "微信公众号",
+        "config_type": "cookie",
+        "description": "需要微信公众号 Cookie。获取方法：登录 mp.weixin.qq.com，复制 Cookie 中的 key=value 格式",
+        "env_key": "WECHAT_MP_COOKIE",
+    },
+    "weibo": {
+        "display_name": "微博",
+        "config_type": "cookie",
+        "description": "需要微博 Cookie 以获取更多内容。获取方法：登录 weibo.com，复制 Cookie",
+        "env_key": "WEIBO_COOKIE",
+    },
+    "zhihu": {
+        "display_name": "知乎",
+        "config_type": "cookie",
+        "description": "需要知乎 Cookie 以获取更多内容。获取方法：登录 zhihu.com，复制 Cookie",
+        "env_key": "ZHIHU_COOKIE",
+    },
+    "bilibili": {
+        "display_name": "B站",
+        "config_type": "cookie",
+        "description": "需要 B站 Cookie 以获取更多内容。获取方法：登录 bilibili.com，复制 Cookie",
+        "env_key": "BILIBILI_COOKIE",
+    },
+    "xiaohongshu": {
+        "display_name": "小红书",
+        "config_type": "cookie",
+        "description": "需要小红书 Cookie。获取方法：登录 xiaohongshu.com，复制 Cookie",
+        "env_key": "XIAOHONGSHU_COOKIE",
+    },
+    "twitter": {
+        "display_name": "Twitter/X",
+        "config_type": "custom",
+        "description": "需要 Twitter 认证信息。格式: {\"auth_token\": \"xxx\", \"ct0\": \"xxx\"}",
+        "env_key": "TWITTER_AUTH",
+    },
+    "instagram": {
+        "display_name": "Instagram",
+        "config_type": "custom",
+        "description": "需要 Instagram Cookie。获取方法：登录 instagram.com，复制 Cookie",
+        "env_key": "INSTAGRAM_COOKIE",
+    },
+    "youtube": {
+        "display_name": "YouTube",
+        "config_type": "api_key",
+        "description": "需要 YouTube API Key。获取方法：Google Cloud Console 创建项目获取",
+        "env_key": "YOUTUBE_KEY",
+    },
+    "github": {
+        "display_name": "GitHub",
+        "config_type": "token",
+        "description": "可选 GitHub Token 提高 API 限制。获取方法：GitHub Settings > Developer settings > Personal access tokens",
+        "env_key": "GITHUB_TOKEN",
+    },
+}
+
+
+# ==================== RSSHub 配置管理 API ====================
+
+def mask_config_value(value: str, show_length: int = 8) -> str:
+    """脱敏显示配置值"""
+    if not value:
+        return ""
+    if len(value) <= show_length:
+        return "*" * len(value)
+    return value[:show_length//2] + "*" * (len(value) - show_length) + value[-show_length//2:]
+
+
+@router.get("/configs/templates")
+async def get_config_templates():
+    """获取需要配置的平台模板列表"""
+    return RSSHUB_CONFIG_TEMPLATES
+
+
+@router.get("/configs", response_model=List[RSSHubConfigResponse])
+async def list_configs(db: Session = Depends(get_db)):
+    """获取所有 RSSHub 配置"""
+    configs = db.query(RSSHubConfig).all()
+    # 脱敏处理
+    result = []
+    for config in configs:
+        config_dict = {
+            "id": config.id,
+            "platform": config.platform,
+            "display_name": config.display_name,
+            "config_type": config.config_type,
+            "config_value": mask_config_value(config.config_value) if config.config_value else "",
+            "description": config.description,
+            "is_active": config.is_active,
+            "created_at": config.created_at,
+            "updated_at": config.updated_at,
+        }
+        result.append(RSSHubConfigResponse(**config_dict))
+    return result
+
+
+@router.post("/configs", response_model=RSSHubConfigResponse)
+async def create_config(
+    data: RSSHubConfigCreate,
+    db: Session = Depends(get_db)
+):
+    """创建或更新 RSSHub 配置"""
+    # 检查是否已存在
+    existing = db.query(RSSHubConfig).filter(
+        RSSHubConfig.platform == data.platform
+    ).first()
+
+    if existing:
+        # 更新
+        existing.display_name = data.display_name
+        existing.config_type = data.config_type
+        existing.config_value = data.config_value
+        existing.description = data.description
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing)
+        config = existing
+    else:
+        # 创建
+        config = RSSHubConfig(
+            id=str(uuid.uuid4()),
+            platform=data.platform,
+            display_name=data.display_name,
+            config_type=data.config_type,
+            config_value=data.config_value,
+            description=data.description,
+        )
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+
+    return RSSHubConfigResponse(
+        id=config.id,
+        platform=config.platform,
+        display_name=config.display_name,
+        config_type=config.config_type,
+        config_value=mask_config_value(config.config_value) if config.config_value else "",
+        description=config.description,
+        is_active=config.is_active,
+        created_at=config.created_at,
+        updated_at=config.updated_at,
+    )
+
+
+@router.delete("/configs/{config_id}")
+async def delete_config(
+    config_id: str,
+    db: Session = Depends(get_db)
+):
+    """删除 RSSHub 配置"""
+    config = db.query(RSSHubConfig).filter(RSSHubConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="配置不存在")
+
+    db.delete(config)
+    db.commit()
+    return {"message": "删除成功"}
+
+
+@router.post("/configs/{config_id}/test")
+async def test_config(
+    config_id: str,
+    db: Session = Depends(get_db)
+):
+    """测试 RSSHub 配置是否有效"""
+    config = db.query(RSSHubConfig).filter(RSSHubConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="配置不存在")
+
+    # 根据平台构建测试 URL
+    test_urls = {
+        "wechat": "/wechat/mp/msgalbum/test",
+        "weibo": "/weibo/user/haoyunyizhou",
+        "zhihu": "/zhihu/hotlist",
+        "bilibili": "/bilibili/ranking/0/3",
+        "xiaohongshu": "/xiaohongshu/user/5e1568321e87dd0001c4cc4f",
+        "twitter": "/twitter/user/elonmusk",
+        "youtube": "/youtube/user/MrBeast",
+        "github": "/github/trending/daily/javascript",
+    }
+
+    platform = config.platform
+    test_path = test_urls.get(platform, f"/{platform}")
+
+    # 调用 RSSHub 测试
+    import httpx
+    from app.config import settings
+
+    rsshub_url = getattr(settings, 'rsshub_url', 'http://rsshub:1200')
+
+    # 构建请求头，注入配置
+    headers = {}
+    if config.config_type == "cookie":
+        headers["Cookie"] = config.config_value
+    elif config.config_type == "api_key":
+        headers["X-API-Key"] = config.config_value
+    elif config.config_type == "token":
+        headers["Authorization"] = f"Bearer {config.config_value}"
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(f"{rsshub_url}{test_path}", headers=headers)
+
+            if response.status_code == 200:
+                return {"success": True, "message": "配置有效，连接成功"}
+            else:
+                return {"success": False, "message": f"配置可能无效，HTTP {response.status_code}"}
+    except Exception as e:
+        return {"success": False, "message": f"连接失败: {str(e)}"}
+
+
+# ==================== RSS 订阅 Routes ====================
 
 @router.post("/", response_model=RSSFeedResponse)
 async def create_feed(

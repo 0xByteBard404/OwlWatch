@@ -72,6 +72,7 @@ from .models.alert import Alert
 from .models.report import Report
 from .models.negative_keyword import NegativeKeyword
 from .models.rss_feed import RSSFeed
+from .models.rsshub_config import RSSHubConfig
 
 # 导入路由
 from .api.v1.auth import auth_router

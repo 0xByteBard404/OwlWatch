@@ -9,6 +9,9 @@ import {
   Link,
   VideoPlay,
   Promotion,
+  Setting,
+  Key,
+  Check,
 } from '@element-plus/icons-vue'
 import {
   rssApi,
@@ -17,6 +20,9 @@ import {
   type RSSFeedCreate,
   type RSSFeedUpdate,
   type RSSHubPlatform,
+  type RSSHubConfig,
+  type RSSHubConfigTemplate,
+  type RSSHubConfigCreate,
   type Keyword,
 } from '@/api'
 
@@ -47,6 +53,20 @@ const selectedRoute = ref('')
 const rsshubParams = ref<Record<string, string>>({})
 const rsshubLoading = ref(false)
 const selectedCategory = ref('')
+
+// RSSHub 配置管理
+const configDialogVisible = ref(false)
+const configTemplates = ref<Record<string, RSSHubConfigTemplate>>({})
+const configs = ref<RSSHubConfig[]>([])
+const configLoading = ref(false)
+const configForm = ref<RSSHubConfigCreate>({
+  platform: '',
+  display_name: '',
+  config_type: 'cookie',
+  config_value: '',
+  description: '',
+})
+const testingConfig = ref(false)
 
 // 获取所有分类
 const categories = computed(() => {
@@ -338,6 +358,93 @@ const openUrl = (url: string) => {
   }
 }
 
+// RSSHub 配置管理
+const openConfigDialog = async () => {
+  configDialogVisible.value = true
+  configLoading.value = true
+  try {
+    const [templatesRes, configsRes] = await Promise.all([
+      rssApi.getConfigTemplates(),
+      rssApi.getConfigs(),
+    ])
+    configTemplates.value = templatesRes
+    configs.value = configsRes
+  } catch (error) {
+    console.error('Failed to fetch config data:', error)
+  } finally {
+    configLoading.value = false
+  }
+}
+
+const openAddConfig = (platform: string) => {
+  const template = configTemplates.value[platform]
+  if (template) {
+    configForm.value = {
+      platform,
+      display_name: template.display_name,
+      config_type: template.config_type,
+      config_value: '',
+      description: template.description,
+    }
+  }
+}
+
+const handleSaveConfig = async () => {
+  if (!configForm.value.config_value.trim()) {
+    ElMessage.warning('请输入配置值')
+    return
+  }
+
+  configLoading.value = true
+  try {
+    await rssApi.createConfig(configForm.value)
+    ElMessage.success('配置保存成功')
+    // 刷新配置列表
+    configs.value = await rssApi.getConfigs()
+    configForm.value.config_value = ''
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.detail || '保存失败')
+  } finally {
+    configLoading.value = false
+  }
+}
+
+const handleDeleteConfig = async (config: RSSHubConfig) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除 ${config.display_name} 的配置吗？`, '确认删除', {
+      type: 'warning',
+    })
+    await rssApi.deleteConfig(config.id)
+    ElMessage.success('删除成功')
+    configs.value = configs.value.filter(c => c.id !== config.id)
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.detail || '删除失败')
+    }
+  }
+}
+
+const handleTestConfig = async (config: RSSHubConfig) => {
+  testingConfig.value = true
+  try {
+    const result = await rssApi.testConfig(config.id)
+    if (result.success) {
+      ElMessage.success(result.message)
+    } else {
+      ElMessage.warning(result.message)
+    }
+  } catch (error: any) {
+    ElMessage.error('测试失败')
+  } finally {
+    testingConfig.value = false
+  }
+}
+
+// 检查平台是否已配置
+const isPlatformConfigured = (platform: string) => {
+  return configs.value.some(c => c.platform === platform && c.is_active)
+}
+
 onMounted(() => {
   fetchData()
   fetchKeywords()
@@ -356,6 +463,10 @@ onMounted(() => {
         <span class="subtitle">RSS SUBSCRIPTIONS</span>
       </div>
       <div class="header-actions">
+        <button class="btn-config" @click="openConfigDialog">
+          <el-icon><Setting /></el-icon>
+          <span>平台配置</span>
+        </button>
         <button class="btn-rsshub" @click="openRSSHubDialog">
           <el-icon><Promotion /></el-icon>
           <span>RSSHub 快捷订阅</span>
@@ -594,6 +705,78 @@ onMounted(() => {
           >
             生成订阅
           </button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- RSSHub Config Dialog -->
+    <el-dialog v-model="configDialogVisible" title="平台配置管理" width="800px" class="cyber-dialog">
+      <div class="config-content" v-loading="configLoading">
+        <div class="config-section">
+          <h4 class="section-title">需要配置的平台</h4>
+          <p class="section-desc">以下平台需要配置 Cookie 或 API Key 才能正常使用</p>
+
+          <div class="platform-config-grid">
+            <div
+              v-for="(template, platform) in configTemplates"
+              :key="platform"
+              class="platform-config-card"
+              :class="{ configured: isPlatformConfigured(platform) }"
+            >
+              <div class="card-header">
+                <span class="platform-name">{{ template.display_name }}</span>
+                <span class="config-type-tag">{{ template.config_type }}</span>
+                <span v-if="isPlatformConfigured(platform)" class="configured-badge">
+                  <el-icon><Check /></el-icon>
+                  已配置
+                </span>
+              </div>
+              <p class="config-desc">{{ template.description }}</p>
+
+              <!-- 查看已有配置 -->
+              <div v-if="configs.find(c => c.platform === platform)" class="existing-config">
+                <div class="config-item">
+                  <span class="config-value-masked">{{ configs.find(c => c.platform === platform)?.config_value }}</span>
+                  <div class="config-actions">
+                    <button class="config-action-btn" @click="handleTestConfig(configs.find(c => c.platform === platform)!)" :loading="testingConfig">
+                      测试
+                    </button>
+                    <button class="config-action-btn delete" @click="handleDeleteConfig(configs.find(c => c.platform === platform)!)">
+                      删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 添加/更新配置 -->
+              <div class="add-config-form" v-if="configForm.platform === platform">
+                <el-input
+                  v-model="configForm.config_value"
+                  :type="template.config_type === 'cookie' ? 'textarea' : 'text'"
+                  :rows="3"
+                  :placeholder="template.config_type === 'cookie' ? '粘贴 Cookie 值...' : '输入配置值...'"
+                />
+                <button class="btn-save-config" @click="handleSaveConfig" :loading="configLoading">
+                  保存
+                </button>
+              </div>
+
+              <button
+                v-if="!isPlatformConfigured(platform) && configForm.platform !== platform"
+                class="btn-add-config"
+                @click="openAddConfig(platform)"
+              >
+                <el-icon><Key /></el-icon>
+                添加配置
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <button class="btn-cancel" @click="configDialogVisible = false">关闭</button>
         </div>
       </template>
     </el-dialog>
@@ -951,6 +1134,209 @@ onMounted(() => {
 .btn-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Config Button */
+.btn-config {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: 1px solid var(--neon-green);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--neon-green);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.btn-config:hover {
+  background: rgba(0, 255, 136, 0.1);
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+}
+
+/* Config Dialog */
+.config-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.config-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.section-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.platform-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.platform-config-card {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.platform-config-card:hover {
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.platform-config-card.configured {
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.platform-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.config-type-tag {
+  padding: 2px 8px;
+  background: rgba(0, 240, 255, 0.1);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+}
+
+.configured-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--neon-green);
+}
+
+.config-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.existing-config {
+  margin-bottom: 12px;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.config-value-masked {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.config-action-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.config-action-btn:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.config-action-btn.delete:hover {
+  border-color: var(--neon-red);
+  color: var(--neon-red);
+}
+
+.add-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.btn-save-config {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--neon-cyan-dim), var(--neon-cyan));
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--bg-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-save-config:hover {
+  box-shadow: var(--glow-cyan);
+}
+
+.btn-add-config {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-add-config:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
 }
 
 /* Responsive */

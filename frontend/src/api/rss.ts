@@ -47,6 +47,7 @@ export interface RSSHubPlatform {
     path: string
     name: string
     params: string[]
+    help?: string
   }>
 }
 
@@ -60,6 +61,34 @@ export interface RSSHubBuildResponse {
   url: string
   platform: string
   route_name: string
+}
+
+// RSSHub 配置相关
+export interface RSSHubConfig {
+  id: string
+  platform: string
+  display_name: string
+  config_type: string
+  config_value: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface RSSHubConfigCreate {
+  platform: string
+  display_name: string
+  config_type: string
+  config_value: string
+  description?: string
+}
+
+export interface RSSHubConfigTemplate {
+  display_name: string
+  config_type: string
+  description: string
+  env_key: string
 }
 
 // API
@@ -90,4 +119,20 @@ export const rssApi = {
 
   buildUrl: (data: RSSHubBuildRequest) =>
     request.post<RSSHubBuildResponse>('/rss/rsshub/build', data),
+
+  // RSSHub 配置管理
+  getConfigTemplates: () =>
+    request.get<Record<string, RSSHubConfigTemplate>>('/rss/configs/templates'),
+
+  getConfigs: () =>
+    request.get<RSSHubConfig[]>('/rss/configs'),
+
+  createConfig: (data: RSSHubConfigCreate) =>
+    request.post<RSSHubConfig>('/rss/configs', data),
+
+  deleteConfig: (id: string) =>
+    request.delete(`/rss/configs/${id}`),
+
+  testConfig: (id: string) =>
+    request.post<{ success: boolean; message: string }>(`/rss/configs/${id}/test`),
 }
