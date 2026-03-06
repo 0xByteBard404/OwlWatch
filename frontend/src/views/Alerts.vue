@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Hide,
@@ -8,6 +9,8 @@ import {
   Refresh,
 } from '@element-plus/icons-vue'
 import { alertsApi, keywordsApi, type Alert, type AlertListParams, type AlertStatsResponse, type Keyword } from '@/api'
+
+const router = useRouter()
 
 const alerts = ref<Alert[]>([])
 const keywords = ref<Keyword[]>([])
@@ -168,6 +171,13 @@ const getKeywordName = (keywordId: string) => {
   return keywords.value.find((k) => k.id === keywordId)?.keyword || keywordId
 }
 
+// 跳转到舆情详情
+const goToArticle = (row: Alert) => {
+  if (row.article_id) {
+    router.push({ path: '/articles', query: { highlight: row.article_id } })
+  }
+}
+
 const statCards = computed(() => {
   if (!stats.value) return []
   return [
@@ -321,8 +331,13 @@ onMounted(() => {
 
         <el-table-column prop="message" label="预警信息" min-width="300">
           <template #default="{ row }">
-            <div class="alert-message">
+            <div
+              class="alert-message"
+              :class="{ clickable: !!row.article_id }"
+              @click="goToArticle(row)"
+            >
               <span class="message-text">{{ row.message }}</span>
+              <span v-if="row.article_id" class="link-hint">查看详情</span>
             </div>
           </template>
         </el-table-column>
@@ -659,10 +674,32 @@ onMounted(() => {
   max-width: 100%;
 }
 
+.alert-message.clickable {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.alert-message.clickable:hover {
+  color: var(--neon-cyan);
+}
+
+.alert-message.clickable:hover .link-hint {
+  opacity: 1;
+}
+
 .message-text {
   font-size: 0.85rem;
   color: var(--text-primary);
   word-break: break-word;
+}
+
+.link-hint {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--neon-cyan);
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .keyword-tag {

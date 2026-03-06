@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { articlesApi, keywordsApi, type Article, type ArticleListParams, type Keyword } from '@/api'
+
+const route = useRoute()
 
 // 数据
 const articles = ref<Article[]>([])
@@ -135,9 +138,28 @@ const openUrl = (url: string) => {
   window.open(url, '_blank')
 }
 
+// 根据 ID 打开文章详情（用于从预警跳转）
+const openArticleById = async (articleId: string) => {
+  try {
+    const article = await articlesApi.get(articleId)
+    if (article) {
+      currentArticle.value = article
+      detailVisible.value = true
+    }
+  } catch (error) {
+    console.error('Failed to fetch article:', error)
+  }
+}
+
 onMounted(() => {
   fetchKeywords()
   fetchData()
+
+  // 检查 URL 参数是否有高亮文章 ID
+  const highlightId = route.query.highlight as string
+  if (highlightId) {
+    openArticleById(highlightId)
+  }
 })
 </script>
 
