@@ -851,6 +851,13 @@ RSSHUB_TEMPLATES = {
             {"path": "/pinterest/search/{keyword}", "name": "搜索", "params": ["keyword"]},
         ]
     },
+    "weread": {
+        "name": "微信读书",
+        "category": "阅读",
+        "routes": [
+            {"path": "/weread/user/{id}", "name": "用户书架", "params": ["id"], "help": "用户 ID 获取方法：微信读书 App > 我的 > 点击头像 > 复制个人主页链接中的数字 ID"},
+        ]
+    },
 }
 
 
