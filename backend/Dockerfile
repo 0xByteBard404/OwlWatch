@@ -2,8 +2,8 @@
 # OwlWatch 舆情监控系统 - 后端 Docker 镜像
 # ============================================
 
-# 使用国内镜像加速
-FROM docker.1ms.run/library/python:3.12-slim
+# 使用官方镜像
+FROM python:3.12-slim
 
 # 设置工作目录
 WORKDIR /app
@@ -12,13 +12,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
     TZ=Asia/Shanghai
-
-# 更换 Debian 源为清华镜像（加速 apt 安装）
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    sed -i 's/security.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
 
 # 安装系统依赖（包括 Playwright 浏览器所需的依赖）
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -52,9 +46,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 复制依赖文件
 COPY requirements.txt .
 
-# 安装 Python 依赖（使用清华 pip 源）
+# 安装 Python 依赖
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r requirements.txt --retries 5 --timeout 60
 
 # 安装 Playwright 浏览器（Chromium，用于百度/Bing 搜索）
 RUN playwright install chromium

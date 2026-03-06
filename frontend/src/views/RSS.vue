@@ -8,7 +8,7 @@ import {
   Refresh,
   Link,
   VideoPlay,
-  Rss,
+  Promotion,
 } from '@element-plus/icons-vue'
 import {
   rssApi,
@@ -71,7 +71,7 @@ const currentPlatformRoutes = computed(() => {
   if (!selectedPlatform.value || !rsshubPlatforms.value[selectedPlatform.value]) {
     return []
   }
-  return rsshubPlatforms.value[selectedPlatform.value].routes
+  return rsshubPlatforms.value[selectedPlatform.value]?.routes || []
 })
 
 // 获取当前路由需要的参数
@@ -242,7 +242,7 @@ const buildRSSHubUrl = async () => {
     // 填充表单
     form.value.feed_url = result.url
     form.value.source_type = selectedPlatform.value
-    form.value.name = `${rsshubPlatforms.value[selectedPlatform.value].name} - ${result.route_name}`
+    form.value.name = `${rsshubPlatforms.value[selectedPlatform.value]?.name || selectedPlatform.value} - ${result.route_name}`
 
     rsshubDialogVisible.value = false
     dialogVisible.value = true
@@ -289,7 +289,7 @@ onMounted(() => {
       </div>
       <div class="header-actions">
         <button class="btn-rsshub" @click="openRSSHubDialog">
-          <el-icon><Rss /></el-icon>
+          <el-icon><Promotion /></el-icon>
           <span>RSSHub 快捷订阅</span>
         </button>
         <button class="btn-primary" @click="handleCreate">
