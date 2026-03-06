@@ -16,6 +16,7 @@ aiosqlite>=0.20.0  # 异步 SQLite 驱动
 aiosmtplib>=3.0.0  # 异步 SMTP 邮件发送
 jieba>=0.42.1  # 中文分词
 playwright>=1.40.0,<2.0.0  # 浏览器自动化（固定版本）
+feedparser>=6.0.0  # RSS/Atom 解析器
 
 # 测试依赖
 pytest>=8.3.5

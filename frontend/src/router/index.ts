@@ -19,6 +19,18 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '监控主体' },
   },
   {
+    path: '/negative-keywords',
+    name: 'NegativeKeywords',
+    component: () => import('@/views/NegativeKeywords.vue'),
+    meta: { title: '负面关键词' },
+  },
+  {
+    path: '/rss',
+    name: 'RSS',
+    component: () => import('@/views/RSS.vue'),
+    meta: { title: 'RSS 订阅' },
+  },
+  {
     path: '/articles',
     name: 'Articles',
     component: () => import('@/views/Articles.vue'),
@@ -29,12 +41,6 @@ const routes: RouteRecordRaw[] = [
     name: 'Alerts',
     component: () => import('@/views/Alerts.vue'),
     meta: { title: '预警中心' },
-  },
-  {
-    path: '/negative-keywords',
-    name: 'NegativeKeywords',
-    component: () => import('@/views/NegativeKeywords.vue'),
-    meta: { title: '负面关键词' },
   },
 ]
 

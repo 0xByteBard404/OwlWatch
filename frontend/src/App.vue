@@ -17,6 +17,7 @@ const menuItems = [
   { path: '/dashboard', icon: 'DataLine', title: '仪表盘', color: '#00f0ff' },
   { path: '/keywords', icon: 'Key', title: '监控主体', color: '#ff6b2c' },
   { path: '/negative-keywords', icon: 'Warning', title: '负面词库', color: '#ffd000' },
+  { path: '/rss', icon: 'Rss', title: 'RSS 订阅', color: '#a855f7' },
   { path: '/articles', icon: 'Document', title: '情报库', color: '#00ff88' },
   { path: '/alerts', icon: 'Bell', title: '预警中心', color: '#ff3366' },
 ]

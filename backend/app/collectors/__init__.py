@@ -3,6 +3,7 @@ from .base import CollectResult, CollectRequest
 from .bocha import BochaCollector
 from .tavily import TavilyCollector
 from .anspire import AnspireCollector
+from .rss_collector import RSSCollector
 
 __all__ = [
     "CollectResult",
@@ -10,4 +11,5 @@ __all__ = [
     "BochaCollector",
     "TavilyCollector",
     "AnspireCollector",
+    "RSSCollector",
 ]

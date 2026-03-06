@@ -71,6 +71,7 @@ from .models.article import Article
 from .models.alert import Alert
 from .models.report import Report
 from .models.negative_keyword import NegativeKeyword
+from .models.rss_feed import RSSFeed
 
 # 导入路由
 from .api.v1.auth import auth_router
@@ -80,6 +81,7 @@ from .api.v1.alerts.router import router as alerts_router
 from .api.v1.reports.router import router as reports_router
 from .api.v1.collect.router import router as collect_router
 from .api.v1.negative_keywords.router import router as negative_keywords_router
+from .api.v1.rss.router import router as rss_router
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -107,6 +109,7 @@ app.include_router(alerts_router, prefix="/api/v1/alerts")
 app.include_router(reports_router, prefix="/api/v1/reports")
 app.include_router(collect_router, prefix="/api/v1/collect")
 app.include_router(negative_keywords_router, prefix="/api/v1/negative-keywords")
+app.include_router(rss_router, prefix="/api/v1/rss")
 
 
 @app.get("/")
@@ -125,9 +128,11 @@ async def startup_event():
     import os
     # 测试环境禁用调度器
     if os.environ.get("DISABLE_SCHEDULER") != "true":
-        from .schedulers import start_scheduler
+        from .schedulers import start_scheduler, start_rss_scheduler
         # 启动调度器
         start_scheduler()
+        # 启动 RSS 调度器
+        start_rss_scheduler()
 
     # 初始化 Redis 连接（用于任务状态存储）
     try:

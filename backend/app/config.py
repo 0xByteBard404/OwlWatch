@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore"  # 忽略 .env 中的额外字段
     )
 
     # 数据库配置
@@ -58,6 +59,12 @@ class Settings(BaseSettings):
     email_smtp_host: Optional[str] = Field(default=None)
     email_smtp_user: Optional[str] = Field(default=None)
     email_smtp_password: Optional[str] = Field(default=None)
+
+    # RSS/RSSHub 配置
+    rsshub_url: str = Field(
+        default="https://rsshub.app",
+        description="RSSHub 实例地址，可自建"
+    )
 
 
 # 全局配置实例
