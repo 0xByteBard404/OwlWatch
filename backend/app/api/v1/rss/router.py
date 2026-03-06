@@ -65,6 +65,7 @@ class RSSFeedTestResponse(BaseModel):
 class RSSHubURLBuild(BaseModel):
     """RSSHub URL 构建请求"""
     platform: str = Field(..., description="平台: weibo/zhihu/bilibili/xiaohongshu")
+    route_path: str = Field(default="", description="路由路径")
     params: dict = Field(default={}, description="参数")
 
 
@@ -233,53 +234,369 @@ async def trigger_fetch(
 # ==================== RSSHub URL Builder ====================
 
 RSSHUB_TEMPLATES = {
+    # ==================== 社交媒体 ====================
     "weibo": {
         "name": "微博",
+        "category": "社交媒体",
         "routes": [
             {"path": "/weibo/keyword/{keyword}", "name": "关键词订阅", "params": ["keyword"]},
             {"path": "/weibo/user/{uid}", "name": "用户动态", "params": ["uid"]},
             {"path": "/weibo/super_index/{id}", "name": "超话", "params": ["id"]},
+            {"path": "/weibo/search/{keyword}", "name": "搜索", "params": ["keyword"]},
         ]
     },
     "zhihu": {
         "name": "知乎",
+        "category": "社交媒体",
         "routes": [
             {"path": "/zhihu/hotlist", "name": "热榜", "params": []},
             {"path": "/zhihu/collection/{id}", "name": "收藏夹", "params": ["id"]},
             {"path": "/zhihu/people/{id}/answers", "name": "用户回答", "params": ["id"]},
+            {"path": "/zhihu/people/{id}/posts", "name": "用户文章", "params": ["id"]},
+            {"path": "/zhihu/topic/{id}/hot", "name": "话题热门", "params": ["id"]},
         ]
     },
     "bilibili": {
         "name": "B站",
+        "category": "社交媒体",
         "routes": [
             {"path": "/bilibili/user/dynamic/{uid}", "name": "用户动态", "params": ["uid"]},
+            {"path": "/bilibili/user/video/{uid}", "name": "用户视频", "params": ["uid"]},
             {"path": "/bilibili/search/{keyword}", "name": "关键词搜索", "params": ["keyword"]},
             {"path": "/bilibili/ranking/0/3", "name": "排行榜", "params": []},
+            {"path": "/bilibili/popular", "name": "综合热门", "params": []},
         ]
     },
     "xiaohongshu": {
         "name": "小红书",
+        "category": "社交媒体",
         "routes": [
             {"path": "/xiaohongshu/user/{user_id}", "name": "用户笔记", "params": ["user_id"]},
+            {"path": "/xiaohongshu/search/{keyword}", "name": "关键词搜索", "params": ["keyword"]},
         ]
     },
     "douyin": {
         "name": "抖音",
+        "category": "社交媒体",
         "routes": [
             {"path": "/douyin/user/{uid}", "name": "用户视频", "params": ["uid"]},
         ]
     },
-    "toutiao": {
-        "name": "今日头条",
+    "twitter": {
+        "name": "Twitter/X",
+        "category": "社交媒体",
         "routes": [
-            {"path": "/toutiao/user/{uid}", "name": "用户文章", "params": ["uid"]},
+            {"path": "/twitter/user/{id}", "name": "用户推文", "params": ["id"]},
+            {"path": "/twitter/search/{keyword}", "name": "关键词搜索", "params": ["keyword"]},
+            {"path": "/twitter/list/{id}", "name": "列表", "params": ["id"]},
         ]
     },
+    "instagram": {
+        "name": "Instagram",
+        "category": "社交媒体",
+        "routes": [
+            {"path": "/instagram/user/{username}", "name": "用户动态", "params": ["username"]},
+            {"path": "/instagram/tag/{tag}", "name": "标签", "params": ["tag"]},
+        ]
+    },
+    "threads": {
+        "name": "Threads",
+        "category": "社交媒体",
+        "routes": [
+            {"path": "/threads/{username}", "name": "用户动态", "params": ["username"]},
+        ]
+    },
+
+    # ==================== 即时通讯/资讯 ====================
+    "wechat": {
+        "name": "微信公众号",
+        "category": "资讯平台",
+        "routes": [
+            {"path": "/wechat/mp/msgalbum/{biz}", "name": "公众号文章", "params": ["biz"]},
+        ]
+    },
+    "toutiao": {
+        "name": "今日头条",
+        "category": "资讯平台",
+        "routes": [
+            {"path": "/toutiao/user/{uid}", "name": "用户文章", "params": ["uid"]},
+            {"path": "/toutiao/keyword/{keyword}", "name": "关键词", "params": ["keyword"]},
+        ]
+    },
+    "dianping": {
+        "name": "大众点评",
+        "category": "生活服务",
+        "routes": [
+            {"path": "/dianping/user/{uid}", "name": "用户点评", "params": ["uid"]},
+        ]
+    },
+
+    # ==================== 视频平台 ====================
+    "youtube": {
+        "name": "YouTube",
+        "category": "视频平台",
+        "routes": [
+            {"path": "/youtube/user/{username}", "name": "用户视频", "params": ["username"]},
+            {"path": "/youtube/channel/{id}", "name": "频道视频", "params": ["id"]},
+            {"path": "/youtube/playlist/{id}", "name": "播放列表", "params": ["id"]},
+        ]
+    },
+    "tiktok": {
+        "name": "TikTok",
+        "category": "视频平台",
+        "routes": [
+            {"path": "/tiktok/user/{uid}", "name": "用户视频", "params": ["uid"]},
+        ]
+    },
+
+    # ==================== 财经科技 ====================
     "36kr": {
         "name": "36氪",
+        "category": "财经科技",
         "routes": [
             {"path": "/36kr/newsflashes", "name": "快讯", "params": []},
             {"path": "/36kr/news", "name": "资讯", "params": []},
+            {"path": "/36kr/motif/{id}", "name": "专题", "params": ["id"]},
+        ]
+    },
+    "wallstreetcn": {
+        "name": "华尔街见闻",
+        "category": "财经科技",
+        "routes": [
+            {"path": "/wallstreetcn/news/global", "name": "全球市场", "params": []},
+            {"path": "/wallstreetcn/news/a-shares", "name": "A股", "params": []},
+        ]
+    },
+    "cls": {
+        "name": "财联社",
+        "category": "财经科技",
+        "routes": [
+            {"path": "/cls/telegraph", "name": "电报", "params": []},
+            {"path": "/cls/depth", "name": "深度", "params": []},
+        ]
+    },
+    "solidot": {
+        "name": "奇客Solidot",
+        "category": "财经科技",
+        "routes": [
+            {"path": "/solidot", "name": "全部", "params": []},
+        ]
+    },
+    "hackernews": {
+        "name": "Hacker News",
+        "category": "财经科技",
+        "routes": [
+            {"path": "/hackernews/best", "name": "最佳", "params": []},
+            {"path": "/hackernews/newest", "name": "最新", "params": []},
+        ]
+    },
+    "producthunt": {
+        "name": "Product Hunt",
+        "category": "财经科技",
+        "routes": [
+            {"path": "/producthunt/today", "name": "今日热门", "params": []},
+        ]
+    },
+
+    # ==================== 社区论坛 ====================
+    "tieba": {
+        "name": "百度贴吧",
+        "category": "社区论坛",
+        "routes": [
+            {"path": "/tieba/forum/{kw}", "name": "吧内帖子", "params": ["kw"]},
+            {"path": "/tieba/forum/{kw}/good", "name": "吧内精品", "params": ["kw"]},
+        ]
+    },
+    "douban": {
+        "name": "豆瓣",
+        "category": "社区论坛",
+        "routes": [
+            {"path": "/douban/movie/playing", "name": "正在上映", "params": []},
+            {"path": "/douban/group/{id}", "name": "小组话题", "params": ["id"]},
+            {"path": "/douban/people/{id}/notes", "name": "用户日记", "params": ["id"]},
+        ]
+    },
+    "reddit": {
+        "name": "Reddit",
+        "category": "社区论坛",
+        "routes": [
+            {"path": "/reddit/subreddit/{subreddit}", "name": "子版块", "params": ["subreddit"]},
+            {"path": "/reddit/search/{keyword}", "name": "搜索", "params": ["keyword"]},
+        ]
+    },
+    "v2ex": {
+        "name": "V2EX",
+        "category": "社区论坛",
+        "routes": [
+            {"path": "/v2ex/topics/hot", "name": "热门", "params": []},
+            {"path": "/v2ex/topics/latest", "name": "最新", "params": []},
+            {"path": "/v2ex/tab/{tab}", "name": "节点", "params": ["tab"]},
+        ]
+    },
+    "discourse": {
+        "name": "Discourse 论坛",
+        "category": "社区论坛",
+        "routes": [
+            {"path": "/discourse/{domain}/latest", "name": "最新话题", "params": ["domain"]},
+        ]
+    },
+
+    # ==================== 新闻媒体 ====================
+    "bbc": {
+        "name": "BBC",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/bbc/chinese", "name": "中文网", "params": []},
+        ]
+    },
+    "cnn": {
+        "name": "CNN",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/cnn", "name": "最新", "params": []},
+        ]
+    },
+    "nytimes": {
+        "name": "纽约时报",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/nytimes/dual_language", "name": "中英双语", "params": []},
+        ]
+    },
+    "reuters": {
+        "name": "路透社",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/reuters/theWire", "name": "最新", "params": []},
+        ]
+    },
+    "dw": {
+        "name": "德国之声",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/dw/chinese", "name": "中文网", "params": []},
+        ]
+    },
+    "rfi": {
+        "name": "法广",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/rfi/china", "name": "中国", "params": []},
+        ]
+    },
+    "thepaper": {
+        "name": "澎湃新闻",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/thepaper/featured", "name": "头条", "params": []},
+            {"path": "/thepaper/list/{id}", "name": "栏目", "params": ["id"]},
+        ]
+    },
+    "sina": {
+        "name": "新浪新闻",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/sina/rollnews", "name": "滚动新闻", "params": []},
+        ]
+    },
+    "netease": {
+        "name": "网易新闻",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/netease/news/rank", "name": "排行榜", "params": []},
+        ]
+    },
+    "ifeng": {
+        "name": "凤凰网",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/ifeng/hot", "name": "热点", "params": []},
+        ]
+    },
+    "caixin": {
+        "name": "财新网",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/caixin/headlines", "name": "头条", "params": []},
+        ]
+    },
+    "guancha": {
+        "name": "观察者网",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/guancha/headline", "name": "头条", "params": []},
+        ]
+    },
+
+    # ==================== 开发者 ====================
+    "github": {
+        "name": "GitHub",
+        "category": "开发者",
+        "routes": [
+            {"path": "/github/trending/daily/{language}", "name": "趋势", "params": ["language"]},
+            {"path": "/github/repos/{user}", "name": "用户仓库", "params": ["user"]},
+            {"path": "/github/starred_repos/{user}", "name": "用户 Star", "params": ["user"]},
+            {"path": "/github/issue/{user}/{repo}", "name": "Issues", "params": ["user", "repo"]},
+        ]
+    },
+    "npm": {
+        "name": "NPM",
+        "category": "开发者",
+        "routes": [
+            {"path": "/npm/package/{pkg}", "name": "包更新", "params": ["pkg"]},
+        ]
+    },
+    "pypi": {
+        "name": "PyPI",
+        "category": "开发者",
+        "routes": [
+            {"path": "/pypi/package/{pkg}", "name": "包更新", "params": ["pkg"]},
+        ]
+    },
+    "dockerhub": {
+        "name": "Docker Hub",
+        "category": "开发者",
+        "routes": [
+            {"path": "/dockerhub/build/{namespace}/{repo}", "name": "构建状态", "params": ["namespace", "repo"]},
+        ]
+    },
+
+    # ==================== 学术 ====================
+    "arxiv": {
+        "name": "arXiv",
+        "category": "学术",
+        "routes": [
+            {"path": "/arxiv/{query}", "name": "搜索", "params": ["query"]},
+        ]
+    },
+    "scholar": {
+        "name": "Google Scholar",
+        "category": "学术",
+        "routes": [
+            {"path": "/google/scholar/{keyword}", "name": "关键词", "params": ["keyword"]},
+        ]
+    },
+
+    # ==================== 设计 ====================
+    "dribbble": {
+        "name": "Dribbble",
+        "category": "设计",
+        "routes": [
+            {"path": "/dribbble/popular", "name": "热门", "params": []},
+        ]
+    },
+    "behance": {
+        "name": "Behance",
+        "category": "设计",
+        "routes": [
+            {"path": "/behance/search/{keyword}", "name": "搜索", "params": ["keyword"]},
+        ]
+    },
+    "pinterest": {
+        "name": "Pinterest",
+        "category": "设计",
+        "routes": [
+            {"path": "/pinterest/search/{keyword}", "name": "搜索", "params": ["keyword"]},
         ]
     },
 }
@@ -289,7 +606,11 @@ RSSHUB_TEMPLATES = {
 async def get_rsshub_platforms():
     """获取 RSSHub 支持的平台列表"""
     return {
-        platform: {"name": info["name"], "routes": info["routes"]}
+        platform: {
+            "name": info["name"],
+            "category": info.get("category", "其他"),
+            "routes": info["routes"]
+        }
         for platform, info in RSSHUB_TEMPLATES.items()
     }
 
@@ -304,13 +625,23 @@ async def build_rsshub_url(
     from app.config import settings
 
     platform = data.platform
+    route_path = data.route_path
     params = data.params
 
     if platform not in RSSHUB_TEMPLATES:
         raise HTTPException(status_code=400, detail="不支持的平台")
 
-    # 获取第一个路由模板
-    template = RSSHUB_TEMPLATES[platform]["routes"][0]
+    # 查找匹配的路由模板
+    template = None
+    for route in RSSHUB_TEMPLATES[platform]["routes"]:
+        if route["path"] == route_path:
+            template = route
+            break
+
+    # 如果没有匹配的路由，使用第一个
+    if not template:
+        template = RSSHUB_TEMPLATES[platform]["routes"][0]
+
     path = template["path"]
 
     # 替换参数

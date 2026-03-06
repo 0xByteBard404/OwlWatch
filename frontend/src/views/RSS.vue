@@ -46,16 +46,76 @@ const selectedPlatform = ref('')
 const selectedRoute = ref('')
 const rsshubParams = ref<Record<string, string>>({})
 const rsshubLoading = ref(false)
+const selectedCategory = ref('')
+
+// 获取所有分类
+const categories = computed(() => {
+  const cats = new Set<string>()
+  Object.values(rsshubPlatforms.value).forEach(p => {
+    if (p.category) cats.add(p.category)
+  })
+  return ['全部', ...Array.from(cats)]
+})
+
+// 按分类筛选平台
+const filteredPlatforms = computed(() => {
+  if (!selectedCategory.value || selectedCategory.value === '全部') {
+    return rsshubPlatforms.value
+  }
+  const filtered: Record<string, RSSHubPlatform> = {}
+  Object.entries(rsshubPlatforms.value).forEach(([key, platform]) => {
+    if (platform.category === selectedCategory.value) {
+      filtered[key] = platform
+    }
+  })
+  return filtered
+})
 
 const sourceTypeOptions = [
-  { label: '通用 RSS', value: 'generic', icon: '📡' },
-  { label: '微博', value: 'weibo', icon: '🐦' },
-  { label: '知乎', value: 'zhihu', icon: '📘' },
-  { label: 'B站', value: 'bilibili', icon: '📺' },
-  { label: '小红书', value: 'xiaohongshu', icon: '📕' },
-  { label: '抖音', value: 'douyin', icon: '🎵' },
-  { label: '今日头条', value: 'toutiao', icon: '📰' },
-  { label: '36氪', value: '36kr', icon: '💼' },
+  // 社交媒体
+  { label: '微博', value: 'weibo', icon: '🐦', category: '社交媒体' },
+  { label: '知乎', value: 'zhihu', icon: '📘', category: '社交媒体' },
+  { label: 'B站', value: 'bilibili', icon: '📺', category: '社交媒体' },
+  { label: '小红书', value: 'xiaohongshu', icon: '📕', category: '社交媒体' },
+  { label: '抖音', value: 'douyin', icon: '🎵', category: '社交媒体' },
+  { label: 'Twitter/X', value: 'twitter', icon: '𝕏', category: '社交媒体' },
+  { label: 'Instagram', value: 'instagram', icon: '📸', category: '社交媒体' },
+  { label: 'Threads', value: 'threads', icon: '🧵', category: '社交媒体' },
+  // 资讯平台
+  { label: '微信公众号', value: 'wechat', icon: '💚', category: '资讯平台' },
+  { label: '今日头条', value: 'toutiao', icon: '📰', category: '资讯平台' },
+  // 视频平台
+  { label: 'YouTube', value: 'youtube', icon: '▶️', category: '视频平台' },
+  { label: 'TikTok', value: 'tiktok', icon: '🎬', category: '视频平台' },
+  // 财经科技
+  { label: '36氪', value: '36kr', icon: '💼', category: '财经科技' },
+  { label: '华尔街见闻', value: 'wallstreetcn', icon: '📈', category: '财经科技' },
+  { label: '财联社', value: 'cls', icon: '💰', category: '财经科技' },
+  { label: 'Hacker News', value: 'hackernews', icon: '🔶', category: '财经科技' },
+  { label: 'Product Hunt', value: 'producthunt', icon: '🚀', category: '财经科技' },
+  // 社区论坛
+  { label: '百度贴吧', value: 'tieba', icon: '💬', category: '社区论坛' },
+  { label: '豆瓣', value: 'douban', icon: '🎬', category: '社区论坛' },
+  { label: 'Reddit', value: 'reddit', icon: '🤖', category: '社区论坛' },
+  { label: 'V2EX', value: 'v2ex', icon: '🖥️', category: '社区论坛' },
+  // 新闻媒体
+  { label: 'BBC', value: 'bbc', icon: '🇬🇧', category: '新闻媒体' },
+  { label: 'CNN', value: 'cnn', icon: '🇺🇸', category: '新闻媒体' },
+  { label: '纽约时报', value: 'nytimes', icon: '📰', category: '新闻媒体' },
+  { label: '澎湃新闻', value: 'thepaper', icon: '🌊', category: '新闻媒体' },
+  { label: '凤凰网', value: 'ifeng', icon: '🔴', category: '新闻媒体' },
+  { label: '财新网', value: 'caixin', icon: '📊', category: '新闻媒体' },
+  // 开发者
+  { label: 'GitHub', value: 'github', icon: '🐙', category: '开发者' },
+  { label: 'NPM', value: 'npm', icon: '📦', category: '开发者' },
+  { label: 'PyPI', value: 'pypi', icon: '🐍', category: '开发者' },
+  // 学术
+  { label: 'arXiv', value: 'arxiv', icon: '📄', category: '学术' },
+  // 设计
+  { label: 'Dribbble', value: 'dribbble', icon: '🏀', category: '设计' },
+  { label: 'Behance', value: 'behance', icon: '🎨', category: '设计' },
+  // 通用
+  { label: '通用 RSS', value: 'generic', icon: '📡', category: '其他' },
 ]
 
 const intervalOptions = [
@@ -236,6 +296,7 @@ const buildRSSHubUrl = async () => {
   try {
     const result = await rssApi.buildUrl({
       platform: selectedPlatform.value,
+      route_path: selectedRoute.value,
       params: rsshubParams.value,
     })
 
@@ -458,15 +519,31 @@ onMounted(() => {
     </el-dialog>
 
     <!-- RSSHub Quick Create Dialog -->
-    <el-dialog v-model="rsshubDialogVisible" title="RSSHub 快捷订阅" width="600px" class="cyber-dialog">
+    <el-dialog v-model="rsshubDialogVisible" title="RSSHub 快捷订阅" width="700px" class="cyber-dialog">
       <div class="rsshub-form">
+        <!-- 分类筛选 -->
+        <div class="form-group">
+          <label class="form-label">选择分类</label>
+          <div class="category-tabs">
+            <button
+              v-for="cat in categories"
+              :key="cat"
+              class="category-tab"
+              :class="{ active: selectedCategory === cat }"
+              @click="selectedCategory = cat; selectedPlatform = ''; selectedRoute = ''"
+            >
+              {{ cat }}
+            </button>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">选择平台</label>
-          <el-select v-model="selectedPlatform" placeholder="选择平台" @change="handlePlatformChange">
+          <el-select v-model="selectedPlatform" placeholder="选择平台" @change="handlePlatformChange" filterable>
             <el-option
-              v-for="(platform, key) in rsshubPlatforms"
+              v-for="(platform, key) in filteredPlatforms"
               :key="key"
-              :label="platform.name"
+              :label="`${platform.category ? `[${platform.category}] ` : ''}${platform.name}`"
               :value="key"
             />
           </el-select>
@@ -770,6 +847,37 @@ onMounted(() => {
   font-size: 0.75rem;
   color: var(--text-muted);
   text-transform: capitalize;
+}
+
+/* Category Tabs */
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-tab {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.category-tab:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.category-tab.active {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
 }
 
 .dialog-footer {

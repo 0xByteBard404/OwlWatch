@@ -42,6 +42,7 @@ export interface RSSFeedTestResponse {
 
 export interface RSSHubPlatform {
   name: string
+  category?: string
   routes: Array<{
     path: string
     name: string
@@ -51,6 +52,7 @@ export interface RSSHubPlatform {
 
 export interface RSSHubBuildRequest {
   platform: string
+  route_path: string
   params: Record<string, string>
 }
 
