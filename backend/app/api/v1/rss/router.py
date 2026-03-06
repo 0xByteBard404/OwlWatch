@@ -112,9 +112,9 @@ class RSSHubConfigResponse(BaseModel):
 RSSHUB_CONFIG_TEMPLATES = {
     "wechat": {
         "display_name": "微信公众号",
-        "config_type": "cookie",
-        "description": "需要微信公众号 Cookie。获取方法：登录 mp.weixin.qq.com，复制 Cookie 中的 key=value 格式",
-        "env_key": "WECHAT_MP_COOKIE",
+        "config_type": "param",
+        "description": "需要 biz 参数。获取方法：在公众号历史消息页面，复制链接中的 __biz 参数值（URL 编码后的字符串）",
+        "env_key": "WECHAT_MP_BIZ",
     },
     "weibo": {
         "display_name": "微博",
