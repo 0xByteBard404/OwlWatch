@@ -141,6 +141,13 @@ const currentRouteParams = computed(() => {
   return route?.params || []
 })
 
+// 获取当前路由的帮助信息
+const currentRouteHelp = computed(() => {
+  if (!selectedRoute.value) return ''
+  const route = currentPlatformRoutes.value.find(r => r.path === selectedRoute.value)
+  return (route as any)?.help || ''
+})
+
 const fetchData = async () => {
   loading.value = true
   try {
@@ -563,6 +570,10 @@ onMounted(() => {
 
         <div class="form-group" v-if="currentRouteParams.length > 0">
           <label class="form-label">填写参数</label>
+          <div v-if="currentRouteHelp" class="route-help">
+            <el-icon><Promotion /></el-icon>
+            <span>{{ currentRouteHelp }}</span>
+          </div>
           <div class="params-grid">
             <div v-for="param in currentRouteParams" :key="param" class="param-item">
               <label>{{ param }}</label>
@@ -847,6 +858,26 @@ onMounted(() => {
   font-size: 0.75rem;
   color: var(--text-muted);
   text-transform: capitalize;
+}
+
+/* Route Help */
+.route-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(255, 107, 44, 0.1);
+  border: 1px solid rgba(255, 107, 44, 0.3);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  font-size: 0.75rem;
+  color: var(--neon-orange);
+  line-height: 1.5;
+}
+
+.route-help .el-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* Category Tabs */

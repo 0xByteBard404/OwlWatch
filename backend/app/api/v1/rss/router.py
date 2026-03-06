@@ -312,7 +312,7 @@ RSSHUB_TEMPLATES = {
         "name": "微信公众号",
         "category": "资讯平台",
         "routes": [
-            {"path": "/wechat/mp/msgalbum/{biz}", "name": "公众号文章", "params": ["biz"]},
+            {"path": "/wechat/mp/msgalbum/{biz}", "name": "公众号文章", "params": ["biz"], "help": "⚠️ 需要配置 Cookie。biz 获取：公众号历史消息链接中的 __biz 参数"},
         ]
     },
     "toutiao": {

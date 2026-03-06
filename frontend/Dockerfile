@@ -23,7 +23,7 @@ COPY . .
 RUN npm run build
 
 # 阶段2: 运行阶段 (使用 nginx 提供静态文件服务)
-FROM docker.1ms.run/library/nginx:alpine AS runner
+FROM nginx:alpine AS runner
 
 # 设置时区
 ENV TZ=Asia/Shanghai
