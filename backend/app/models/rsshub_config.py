@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """RSSHub 配置模型"""
 from sqlalchemy import Column, String, Text, DateTime, Boolean
+from ..utils.timezone import now_cst
 from datetime import datetime
 import uuid
 
@@ -18,5 +19,5 @@ class RSSHubConfig(Base):
     config_value = Column(Text, nullable=True)  # 配置值
     description = Column(Text, nullable=True)  # 使用说明
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=now_cst)
+    updated_at = Column(DateTime, default=now_cst, onupdate=now_cst)

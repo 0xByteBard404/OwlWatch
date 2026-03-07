@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """报告模型"""
+from ..utils.timezone import now_cst
 from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime as SQLDateTime
 from ..database import Base
@@ -14,4 +15,4 @@ class Report(Base):
     title = Column(String(200), nullable=False)
     content = Column(Text, nullable=True)
     report_type = Column(String(20), default="daily")  # daily/weekly/monthly
-    generated_at = Column(SQLDateTime, default=datetime.utcnow)
+    generated_at = Column(SQLDateTime, default=now_cst)

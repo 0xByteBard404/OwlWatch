@@ -18,6 +18,7 @@ from app.collectors.bocha import BochaCollector
 from app.collectors.tavily import TavilyCollector
 from app.collectors.anspire import AnspireCollector
 from app.collectors.bing import BingCollector
+from app.utils.timezone import now_cst
 from app.collectors.baidu import BaiduCollector
 from app.collectors.base import CollectRequest
 from app.config import settings
@@ -329,7 +330,7 @@ async def run_collect_task(
         await task_store.update(task_id, {
             "status": "completed",
             "collected_count": saved_count,
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": now_cst().isoformat(),
             "message": f"采集完成，新增 {saved_count} 条文章"
         })
 
@@ -338,7 +339,7 @@ async def run_collect_task(
         await task_store.update(task_id, {
             "status": "failed",
             "message": str(e),
-            "finished_at": datetime.utcnow().isoformat()
+            "finished_at": now_cst().isoformat()
         })
     finally:
         db.close()
@@ -376,7 +377,7 @@ async def trigger_collect(
         "status": "pending",
         "collected_count": 0,
         "message": "任务已创建，等待执行",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": now_cst().isoformat(),
         "finished_at": None,
     })
 
@@ -442,7 +443,7 @@ async def trigger_collect_all(background_tasks: BackgroundTasks, db: Session = D
             "status": "pending",
             "collected_count": 0,
             "message": "任务已创建",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": now_cst().isoformat(),
             "finished_at": None,
         })
 

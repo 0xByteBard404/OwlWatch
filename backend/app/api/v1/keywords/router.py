@@ -9,6 +9,7 @@ import uuid
 
 from app.dependencies import get_db
 from app.models.keyword import Keyword
+from app.utils.timezone import now_cst
 
 router = APIRouter()
 
@@ -93,7 +94,7 @@ async def update_keyword(
     keyword_obj.keyword = data.keyword
     keyword_obj.priority = data.priority
     keyword_obj.platforms = data.platforms
-    keyword_obj.updated_at = datetime.utcnow()
+    keyword_obj.updated_at = now_cst()
 
     db.commit()
     db.refresh(keyword_obj)

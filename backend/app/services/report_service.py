@@ -12,6 +12,7 @@ from ..models.keyword import Keyword
 from ..config import settings
 from ..analyzers.summary import SummaryGenerator
 from ..analyzers.trend import TrendAnalyzer
+from ..utils.timezone import now_cst
 
 
 class ReportService:
@@ -53,11 +54,11 @@ class ReportService:
 
         # 确定时间范围
         if time_range == "24小时":
-            start_time = datetime.utcnow() - timedelta(hours=24)
+            start_time = now_cst() - timedelta(hours=24)
         elif time_range == "7天":
-            start_time = datetime.utcnow() - timedelta(days=7)
+            start_time = now_cst() - timedelta(days=7)
         else:
-            start_time = datetime.utcnow() - timedelta(hours=24)
+            start_time = now_cst() - timedelta(hours=24)
 
         # 获取关键词
         query = self.db.query(Keyword).filter(Keyword.tenant_id == tenant_id)
@@ -125,7 +126,7 @@ class ReportService:
 
         # 构建报告内容
         report_content = {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": now_cst().isoformat(),
             "time_range": time_range,
             "keywords": keyword_stats,
             "summary": summary,
@@ -137,7 +138,7 @@ class ReportService:
         report = Report(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            title=f"舆情分析报告 - {datetime.utcnow().strftime('%Y-%m-%d')}",
+            title=f"舆情分析报告 - {now_cst().strftime('%Y-%m-%d')}",
             content=json.dumps(report_content, ensure_ascii=False),
             report_type=report_type
         )

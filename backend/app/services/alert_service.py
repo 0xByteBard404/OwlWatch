@@ -13,6 +13,7 @@ from ..models.article import Article
 from ..models.keyword import Keyword
 from ..config import settings
 from ..analyzers.sentiment import SentimentAnalyzer
+from ..utils.timezone import now_cst
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class AlertService:
     async def check_and_alert(self, keyword_id: str):
         """检查关键词并触发预警"""
         # 获取最近 1 小时的文章
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = now_cst() - timedelta(hours=1)
         articles = self.db.query(Article).filter(
             Article.keyword_id == keyword_id,
             Article.collect_time >= one_hour_ago
@@ -91,7 +92,7 @@ class AlertService:
 
     async def _check_cooldown(self, keyword_id: str, alert_type: str) -> bool:
         """检查预警冷却期（同类型预警 1 小时内不重复发送）"""
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = now_cst() - timedelta(hours=1)
         existing = self.db.query(Alert).filter(
             Alert.keyword_id == keyword_id,
             Alert.alert_type == alert_type,
@@ -128,7 +129,7 @@ class AlertService:
         rule = self.rules[alert_type]
 
         # 检查最近已创建的敏感词预警，避免重复
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = now_cst() - timedelta(hours=1)
         existing_alerts = self.db.query(Alert).filter(
             Alert.keyword_id == keyword.id,
             Alert.alert_type == alert_type,
@@ -180,8 +181,8 @@ class AlertService:
             return
 
         # 获取前 1 小时的文章数作为基准
-        two_hours_ago = datetime.utcnow() - timedelta(hours=2)
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        two_hours_ago = now_cst() - timedelta(hours=2)
+        one_hour_ago = now_cst() - timedelta(hours=1)
 
         previous_count = self.db.query(Article).filter(
             Article.keyword_id == keyword.id,

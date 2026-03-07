@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """预警模型"""
+from ..utils.timezone import now_cst
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime as SQLDateTime
 from ..database import Base
@@ -17,5 +18,5 @@ class Alert(Base):
     alert_level = Column(String(20), default="info")  # info/warning/critical
     status = Column(String(20), default="pending")  # pending/handled/ignored
     message = Column(String(500), nullable=True)
-    created_at = Column(SQLDateTime, default=datetime.utcnow)
+    created_at = Column(SQLDateTime, default=now_cst)
     handled_at = Column(SQLDateTime, nullable=True)

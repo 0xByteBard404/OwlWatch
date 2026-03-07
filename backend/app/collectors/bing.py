@@ -6,6 +6,7 @@ from typing import List, Optional
 from urllib.parse import quote
 
 from .base import CollectResult, CollectRequest, extract_domain_from_url
+from ..utils.timezone import now_cst
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def _bing_collect_worker(keyword: str, max_results: int) -> List[dict]:
                         'url': href,
                         'source': source.strip(),
                         'source_type': 'bing',
-                        'publish_time': datetime.utcnow().isoformat(),
+                        'publish_time': now_cst.isoformat(),
                     })
                 except Exception as e:
                     continue

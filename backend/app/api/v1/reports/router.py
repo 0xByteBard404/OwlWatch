@@ -8,6 +8,7 @@ from datetime import datetime
 
 from app.dependencies import get_db
 from app.models.report import Report
+from app.utils.timezone import now_cst
 
 router = APIRouter()
 
@@ -42,7 +43,7 @@ async def generate_report(
     report = Report(
         id=str(uuid.uuid4()),
         tenant_id="default-tenant",
-        title=f"Sentiment Analysis Report - {datetime.utcnow().strftime('%Y-%m-%d')}",
+        title=f"Sentiment Analysis Report - {now_cst.strftime('%Y-%m-%d')}",
         content="Report generation in progress...",
         report_type=data.report_type,
     )

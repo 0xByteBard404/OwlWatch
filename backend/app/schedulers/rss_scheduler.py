@@ -7,6 +7,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
+from sqlalchemy.exc import IntegrityError
+
 from ..database import SessionLocal
 from ..models.rss_feed import RSSFeed
 from ..models.article import Article
@@ -15,6 +17,7 @@ from ..collectors.rss_collector import RSSCollector
 from ..analyzers.sentiment import SentimentAnalyzer
 from ..services.alert_service import AlertService
 from ..config import settings
+from ..utils.timezone import now_cst
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +86,13 @@ async def fetch_feed(feed: RSSFeed, db: Session) -> int:
                 if not title_match and not content_match:
                     continue
 
-            # 检查是否已存在（基于 URL）
+            # 检查是否已存在（基于 URL）- 应用层快速检查
             existing = db.query(Article).filter(
                 Article.url == item.url
             ).first()
 
             if existing:
+                logger.debug(f"跳过已存在的文章: {item.url}")
                 continue
 
             # AI 情感分析
@@ -122,8 +126,16 @@ async def fetch_feed(feed: RSSFeed, db: Session) -> int:
             db.add(article)
             saved_count += 1
 
+        # 提交事务，捕获唯一约束冲突（并发情况下的竞态条件）
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            logger.warning(f"RSS 提交时检测到重复URL，已回滚: {feed.name}")
+            saved_count = 0
+
         # 更新 Feed 状态
-        feed.last_fetched = datetime.utcnow()
+        feed.last_fetched = now_cst()
         feed.fetch_error_count = 0
         feed.last_error = None
         if new_etag:
@@ -163,7 +175,7 @@ async def fetch_all_feeds():
         logger.info(f"[{datetime.now()}] 开始获取 {len(feeds)} 个 RSS 订阅")
 
         # 根据 fetch_interval 过滤出需要获取的 Feed
-        now = datetime.utcnow()
+        now = now_cst()
         feeds_to_fetch = []
         for feed in feeds:
             if feed.last_fetched is None:

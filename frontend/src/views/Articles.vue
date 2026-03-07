@@ -142,6 +142,51 @@ const getKeywordName = (keywordId: string) => {
   return keywords.value.find((k) => k.id === keywordId)?.keyword || keywordId
 }
 
+// 格式化时间（人性化显示）
+const formatTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '-'
+
+  const date = new Date(dateStr)
+  const now = new Date()
+
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  const timeStr = `${hours}:${minutes}`
+
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+
+  // 判断是否今天
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+
+  if (isToday) {
+    return `今天 ${timeStr}`
+  }
+
+  // 判断是否昨天
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+
+  if (isYesterday) {
+    return `昨天 ${timeStr}`
+  }
+
+  // 同一年：显示 MM-DD HH:mm
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${month}-${day} ${timeStr}`
+  }
+
+  // 不同年：显示 YYYY-MM-DD HH:mm
+  return `${date.getFullYear()}-${month}-${day} ${timeStr}`
+}
+
 // 清理 HTML 内容 - 移除乱码字符和限制图片
 const sanitizeHtml = (html: string | null | undefined, maxLength?: number, removeImages = false): string => {
   if (!html) return ''
@@ -308,7 +353,7 @@ onMounted(() => {
         <div class="article-footer">
           <span v-if="article.keyword_id" class="keyword-tag">{{ getKeywordName(article.keyword_id) }}</span>
           <span class="article-time">
-            {{ article.publish_time ? new Date(article.publish_time).toLocaleDateString() : '-' }}
+            {{ formatTime(article.publish_time) }}
           </span>
         </div>
 
@@ -376,13 +421,11 @@ onMounted(() => {
           </div>
           <div class="meta-item">
             <span class="meta-label">发布时间</span>
-            <span class="meta-value">
-              {{ currentArticle.publish_time ? new Date(currentArticle.publish_time).toLocaleString() : '-' }}
-            </span>
+            <span class="meta-value">{{ formatTime(currentArticle.publish_time) }}</span>
           </div>
           <div class="meta-item">
             <span class="meta-label">采集时间</span>
-            <span class="meta-value">{{ new Date(currentArticle.collect_time).toLocaleString() }}</span>
+            <span class="meta-value">{{ formatTime(currentArticle.collect_time) }}</span>
           </div>
         </div>
 

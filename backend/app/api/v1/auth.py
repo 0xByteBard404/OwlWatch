@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.dependencies import get_db
+from app.utils.timezone import now_cst
 
 auth_router = APIRouter()
 
@@ -65,7 +66,7 @@ async def login(credentials: UserLogin):
         access_token = create_access_token({
             "sub": "admin",
             "tenant_id": "default-tenant",
-            "exp": (datetime.utcnow() + timedelta(hours=24)).isoformat()
+            "exp": (now_cst() + timedelta(hours=24)).isoformat()
         })
 
         return TokenResponse(

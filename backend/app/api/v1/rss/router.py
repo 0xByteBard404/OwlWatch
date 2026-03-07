@@ -13,6 +13,7 @@ from app.dependencies import get_db
 from app.models.rss_feed import RSSFeed
 from app.models.rsshub_config import RSSHubConfig
 from app.schedulers.rss_scheduler import fetch_feed
+from app.utils.timezone import now_cst
 
 router = APIRouter()
 
@@ -223,7 +224,7 @@ async def create_config(
         existing.config_type = data.config_type
         existing.config_value = data.config_value
         existing.description = data.description
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = now_cst()
         db.commit()
         db.refresh(existing)
         config = existing
@@ -405,7 +406,7 @@ async def update_feed(
     for key, value in update_data.items():
         setattr(feed, key, value)
 
-    feed.updated_at = datetime.utcnow()
+    feed.updated_at = now_cst()
     db.commit()
     db.refresh(feed)
 

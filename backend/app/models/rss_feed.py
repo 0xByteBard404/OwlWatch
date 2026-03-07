@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """RSS 订阅源模型"""
+from ..utils.timezone import now_cst
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime as SQLDateTime, Integer, Text
 from ..database import Base
@@ -36,5 +37,5 @@ class RSSFeed(Base):
     total_entries = Column(Integer, default=0)  # 累计获取条目数
     
     # 时间戳
-    created_at = Column(SQLDateTime, default=datetime.utcnow)
-    updated_at = Column(SQLDateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(SQLDateTime, default=now_cst)
+    updated_at = Column(SQLDateTime, default=now_cst, onupdate=now_cst)

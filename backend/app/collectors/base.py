@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from urllib.parse import urlparse
 
+from ..utils.timezone import now_cst
+
 
 def extract_domain_from_url(url: str) -> str:
     """从 URL 中提取域名作为来源"""
@@ -30,7 +32,7 @@ class CollectResult(BaseModel):
     source: str = Field(default="", description="来源平台")
     source_type: str = Field(..., description="API来源")
     publish_time: Optional[datetime] = Field(default=None, description="发布时间")
-    collect_time: datetime = Field(default_factory=datetime.utcnow, description="采集时间")
+    collect_time: datetime = Field(default_factory=now_cst, description="采集时间")
     sentiment_score: Optional[float] = Field(default=None, description="情感分数")
     extra: Optional[dict] = Field(default=None, description="扩展字段")
 

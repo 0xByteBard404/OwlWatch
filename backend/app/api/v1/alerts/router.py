@@ -12,6 +12,7 @@ from datetime import datetime
 from app.dependencies import get_db
 from app.models.alert import Alert
 from app.services.alert_service import AlertService
+from app.utils.timezone import now_cst
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ async def handle_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     alert.status = "handled"
-    alert.handled_at = datetime.utcnow()
+    alert.handled_at = now_cst()
 
     db.commit()
 
@@ -153,7 +154,7 @@ async def ignore_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     alert.status = "ignored"
-    alert.handled_at = datetime.utcnow()
+    alert.handled_at = now_cst()
 
     db.commit()
 
@@ -172,7 +173,7 @@ async def batch_handle_alerts(
     updated = db.query(Alert).filter(
         Alert.id.in_(request.alert_ids)
     ).update(
-        {"status": "handled", "handled_at": datetime.utcnow()},
+        {"status": "handled", "handled_at": now_cst()},
         synchronize_session=False
     )
 

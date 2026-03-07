@@ -6,6 +6,7 @@ from typing import List, Optional
 from urllib.parse import quote
 
 from .base import CollectResult, CollectRequest, extract_domain_from_url
+from ..utils.timezone import now_cst
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ def _baidu_collect_worker(keyword: str, max_results: int) -> List[dict]:
                         'url': real_url,  # 使用真实URL
                         'source': source.strip(),
                         'source_type': 'baidu',
-                        'publish_time': datetime.utcnow().isoformat(),
+                        'publish_time': now_cst.isoformat(),
                     })
                 except Exception as e:
                     continue

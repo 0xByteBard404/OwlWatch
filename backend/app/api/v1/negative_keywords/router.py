@@ -9,6 +9,7 @@ from datetime import datetime
 
 from app.dependencies import get_db
 from app.models.negative_keyword import NegativeKeyword
+from app.utils.timezone import now_cst
 
 router = APIRouter()
 
@@ -85,7 +86,7 @@ async def update_negative_keyword(
         raise HTTPException(status_code=400, detail="关键词已存在")
 
     keyword.keyword = data.keyword
-    keyword.updated_at = datetime.utcnow()
+    keyword.updated_at = now_cst()
     db.commit()
     db.refresh(keyword)
     return keyword
@@ -102,7 +103,7 @@ async def toggle_negative_keyword(
         raise HTTPException(status_code=404, detail="关键词不存在")
 
     keyword.is_active = not keyword.is_active
-    keyword.updated_at = datetime.utcnow()
+    keyword.updated_at = now_cst()
     db.commit()
     return {"message": f"关键词已{'启用' if keyword.is_active else '禁用'}", "is_active": keyword.is_active}
 

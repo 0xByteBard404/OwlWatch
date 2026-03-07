@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from app.dependencies import get_db
 from app.models.article import Article
+from app.utils.timezone import now_cst
 
 router = APIRouter()
 
@@ -67,8 +68,10 @@ async def list_articles(
         query = query.filter(Article.publish_time <= end_date)
 
     total = query.count()
-    # 按发布时间倒序排列（最新的在前，空值放最后）
-    items = query.order_by(Article.publish_time.desc()).offset((page - 1) * size).limit(size).all()
+    # 按发布时间倒序排列（发布时间为空则用采集时间）
+    items = query.order_by(
+        func.coalesce(Article.publish_time, Article.collect_time).desc()
+    ).offset((page - 1) * size).limit(size).all()
 
     return ArticleListResponse(
         items=items,
@@ -141,7 +144,7 @@ class StatsResponse(BaseModel):
 @router.get("/stats/overview", response_model=StatsResponse)
 async def get_stats_overview(db: Session = Depends(get_db)):
     """获取概览统计"""
-    now = datetime.utcnow()
+    now = now_cst()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=7)
 
@@ -174,7 +177,7 @@ async def get_trend(
     db: Session = Depends(get_db)
 ):
     """获取舆情趋势数据"""
-    now = datetime.utcnow()
+    now = now_cst()
     start_date = now - timedelta(days=days)
 
     query = db.query(Article).filter(Article.collect_time >= start_date)
@@ -247,7 +250,7 @@ async def get_word_frequency(
     db: Session = Depends(get_db)
 ):
     """获取高频词统计（用于词云）"""
-    now = datetime.utcnow()
+    now = now_cst()
     start_date = now - timedelta(days=days)
 
     query = db.query(Article).filter(Article.collect_time >= start_date)

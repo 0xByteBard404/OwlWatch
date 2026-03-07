@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """关键词模型"""
+from ..utils.timezone import now_cst
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime as SQLDateTime, Text
 from sqlalchemy.types import TypeDecorator
@@ -33,5 +34,5 @@ class Keyword(Base):
     priority = Column(String(10), default="medium")  # high/medium/low
     platforms = Column(JSONEncodedDict, nullable=True)  # JSON: ["bocha", "tavily"]
     is_active = Column(Boolean, default=True)
-    created_at = Column(SQLDateTime, default=datetime.utcnow)
-    updated_at = Column(SQLDateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(SQLDateTime, default=now_cst)
+    updated_at = Column(SQLDateTime, default=now_cst, onupdate=now_cst)
