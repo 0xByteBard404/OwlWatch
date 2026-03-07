@@ -19,10 +19,10 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '监控主体' },
   },
   {
-    path: '/negative-keywords',
-    name: 'NegativeKeywords',
-    component: () => import('@/views/NegativeKeywords.vue'),
-    meta: { title: '负面关键词' },
+    path: '/sentiment-keywords',
+    name: 'SentimentKeywords',
+    component: () => import('@/views/SentimentKeywords.vue'),
+    meta: { title: '情感词库' },
   },
   {
     path: '/rss',

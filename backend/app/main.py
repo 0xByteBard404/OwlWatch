@@ -83,6 +83,8 @@ from .api.v1.reports.router import router as reports_router
 from .api.v1.collect.router import router as collect_router
 from .api.v1.negative_keywords.router import router as negative_keywords_router
 from .api.v1.rss.router import router as rss_router
+from .api.v1.sentiment_keywords.router import router as sentiment_keywords_router
+from .models.sentiment_keyword import SentimentKeyword
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -111,6 +113,7 @@ app.include_router(reports_router, prefix="/api/v1/reports")
 app.include_router(collect_router, prefix="/api/v1/collect")
 app.include_router(negative_keywords_router, prefix="/api/v1/negative-keywords")
 app.include_router(rss_router, prefix="/api/v1/rss")
+app.include_router(sentiment_keywords_router, prefix="/api/v1/sentiment-keywords")
 
 
 @app.get("/")

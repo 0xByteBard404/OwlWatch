@@ -19,7 +19,7 @@ const menuItems = [
   { path: '/keywords', icon: 'Key', title: '监控主体', color: '#ff6b2c' },
   { path: '/articles', icon: 'Document', title: '情报库', color: '#00ff88' },
   { path: '/alerts', icon: 'Bell', title: '预警中心', color: '#ff3366' },
-  { path: '/negative-keywords', icon: 'Warning', title: '负面词库', color: '#ffd000' },
+  { path: '/sentiment-keywords', icon: 'TrendCharts', title: '情感词库', color: '#ffd000' },
 ]
 
 const handleSelect = (path: string) => {
