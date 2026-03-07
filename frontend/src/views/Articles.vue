@@ -8,6 +8,7 @@ const route = useRoute()
 // 数据
 const articles = ref<Article[]>([])
 const keywords = ref<Keyword[]>([])
+const sources = ref<string[]>([])
 const total = ref(0)
 const loading = ref(false)
 
@@ -33,11 +34,19 @@ const sentimentOptions = [
   { label: '负面', value: 'negative', color: '#ff3366' },
 ]
 
-// 获取来源列表
+// 获取来源列表（从 API）
 const sourceOptions = computed(() => {
-  const sources = new Set(articles.value.map((a) => a.source).filter(Boolean))
-  return Array.from(sources).map((s) => ({ label: s, value: s }))
+  return sources.value.map((s) => ({ label: s, value: s }))
 })
+
+// 获取来源列表
+const fetchSources = async () => {
+  try {
+    sources.value = await articlesApi.getSourcesList()
+  } catch (error) {
+    console.error('Failed to fetch sources:', error)
+  }
+}
 
 // 获取关键词列表
 const fetchKeywords = async () => {
@@ -133,6 +142,26 @@ const getKeywordName = (keywordId: string) => {
   return keywords.value.find((k) => k.id === keywordId)?.keyword || keywordId
 }
 
+// 清理 HTML 内容 - 移除乱码字符和限制图片
+const sanitizeHtml = (html: string | null | undefined, maxLength?: number, removeImages = false): string => {
+  if (!html) return ''
+
+  // 移除 Unicode 私有使用区字符 (乱码)
+  let cleaned = html.replace(/[\uE000-\uF8FF\uDB80-\uDBFF]/g, '')
+
+  // 如果需要移除图片
+  if (removeImages) {
+    cleaned = cleaned.replace(/<img[^>]*>/gi, '')
+  }
+
+  // 如果指定了最大长度，截取内容
+  if (maxLength && cleaned.length > maxLength) {
+    cleaned = cleaned.slice(0, maxLength) + '...'
+  }
+
+  return cleaned
+}
+
 // 打开链接
 const openUrl = (url: string) => {
   window.open(url, '_blank')
@@ -153,6 +182,7 @@ const openArticleById = async (articleId: string) => {
 
 onMounted(() => {
   fetchKeywords()
+  fetchSources()
   fetchData()
 
   // 检查 URL 参数是否有高亮文章 ID
@@ -272,11 +302,11 @@ onMounted(() => {
         <h4 class="article-title">{{ article.title }}</h4>
 
         <!-- Article Content Preview -->
-        <p class="article-excerpt">{{ article.content?.slice(0, 120) || '暂无内容摘要...' }}</p>
+        <p class="article-excerpt" v-html="sanitizeHtml(article.content, 120, true) || '暂无内容摘要...'"></p>
 
         <!-- Article Footer -->
         <div class="article-footer">
-          <span class="keyword-tag">{{ getKeywordName(article.keyword_id) }}</span>
+          <span v-if="article.keyword_id" class="keyword-tag">{{ getKeywordName(article.keyword_id) }}</span>
           <span class="article-time">
             {{ article.publish_time ? new Date(article.publish_time).toLocaleDateString() : '-' }}
           </span>
@@ -359,8 +389,7 @@ onMounted(() => {
         <!-- Content -->
         <div class="detail-body">
           <h4 class="body-title">内容摘要</h4>
-          <div class="body-content">
-            {{ currentArticle.content || '暂无内容' }}
+          <div class="body-content" v-html="sanitizeHtml(currentArticle.content) || '暂无内容'">
           </div>
         </div>
 
@@ -765,10 +794,39 @@ onMounted(() => {
   font-size: 0.9rem;
   color: var(--text-primary);
   line-height: 1.8;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
+}
+
+.body-content :deep(p) {
+  margin: 0 0 12px 0;
+  line-height: 1.8;
+}
+
+.body-content :deep(img) {
+  max-width: 100% !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: block;
+  margin: 12px auto;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.body-content :deep(a) {
+  color: var(--neon-cyan);
+  text-decoration: none;
+}
+
+.body-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.body-content :deep(br) {
+  display: block;
+  margin-bottom: 8px;
 }
 
 .detail-link {

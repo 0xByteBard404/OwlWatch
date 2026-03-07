@@ -73,16 +73,14 @@ def get_anspire_collector():
 
 
 def get_sentiment_analyzer():
-    """获取情感分析器实例"""
+    """获取情感分析器实例（默认使用本地免费模式）"""
     if "sentiment" not in _collectors:
-        if settings.bailian_api_key:
-            try:
-                _collectors["sentiment"] = SentimentAnalyzer(settings.bailian_api_key)
-                logger.info("Sentiment analyzer initialized")
-            except Exception as e:
-                logger.error(f"Failed to initialize Sentiment analyzer: {e}")
-                _collectors["sentiment"] = None
-        else:
+        try:
+            # 使用本地免费分析，无需 API Key
+            _collectors["sentiment"] = SentimentAnalyzer(use_local=True)
+            logger.info("Sentiment analyzer initialized (local mode)")
+        except Exception as e:
+            logger.error(f"Failed to initialize Sentiment analyzer: {e}")
             _collectors["sentiment"] = None
     return _collectors.get("sentiment")
 

@@ -1,19 +1,24 @@
-"""情感分析器 - 基于百炼 qwen3-max"""
-import httpx
+"""情感分析器 - 支持本地免费分析（snownlp）和 API 分析"""
 import logging
-import re
 from typing import Optional
-import json
+from snownlp import SnowNLP
 
 logger = logging.getLogger(__name__)
 
 
 class SentimentAnalyzer:
-    """情感分析器"""
+    """情感分析器 - 默认使用本地免费方案"""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str] = None, use_local: bool = True):
+        """
+        初始化情感分析器
+
+        Args:
+            api_key: API密钥（可选，用于云服务）
+            use_local: 是否使用本地分析（默认True，完全免费）
+        """
         self.api_key = api_key
-        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+        self.use_local = use_local
 
     async def analyze(self, content: str) -> dict:
         """分析内容情感
@@ -26,6 +31,55 @@ class SentimentAnalyzer:
         """
         if not content or len(content.strip()) < 10:
             return {"score": 0, "label": "neutral", "reason": "内容太短"}
+
+        if self.use_local:
+            return await self._local_analyze(content)
+        else:
+            return await self._api_analyze(content)
+
+    async def _local_analyze(self, content: str) -> dict:
+        """使用 snownlp 本地分析（免费）"""
+        try:
+            # 清理 HTML 标签
+            import re
+            clean_content = re.sub(r'<[^>]+>', '', content)
+
+            s = SnowNLP(clean_content[:2000])  # 限制长度
+            score = s.sentiments  # 返回 0-1，0.5 为中性
+
+            # 转换为 -1 到 1 的范围
+            normalized_score = (score - 0.5) * 2
+
+            # 判断标签
+            if score > 0.6:
+                label = "positive"
+                reason = "正面情感"
+            elif score < 0.4:
+                label = "negative"
+                reason = "负面情感"
+            else:
+                label = "neutral"
+                reason = "中性情感"
+
+            return {
+                "score": round(normalized_score, 3),
+                "label": label,
+                "reason": reason
+            }
+        except Exception as e:
+            logger.error(f"Local sentiment analyze error: {e}")
+            return {"score": 0, "label": "neutral", "reason": "分析失败"}
+
+    async def _api_analyze(self, content: str) -> dict:
+        """使用 API 分析（需要 api_key）"""
+        import httpx
+        import json
+
+        if not self.api_key:
+            logger.warning("No API key provided, falling back to local analysis")
+            return await self._local_analyze(content)
+
+        base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 
         prompt = f"""你是一个专业的舆情分析师。请分析以下新闻报道或文章的情感倾向。
 
@@ -48,58 +102,39 @@ class SentimentAnalyzer:
         }
 
         payload = {
-            "model": "qwen3-max",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
+            "model": "qwen-turbo",  # 使用更便宜的 qwen-turbo
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.1,
             "max_tokens": 200
         }
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.base_url,
-                    headers=headers,
-                    json=payload,
-                )
+                response = await client.post(base_url, headers=headers, json=payload)
 
                 if response.status_code != 200:
-                    logger.error(f"Sentiment API error: status={response.status_code}, body={response.text[:500]}")
+                    logger.error(f"Sentiment API error: status={response.status_code}")
                     return {"score": 0, "label": "neutral", "reason": "API调用失败"}
 
                 data = response.json()
 
-            # 解析响应
             content_text = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
-
-            # 清理 AI 返回内容（可能包含 ```json ... ```）
             cleaned = self._extract_json(content_text)
             result = json.loads(cleaned)
             return result
-        except httpx.TimeoutException:
-            logger.error("Sentiment API timeout")
-            return {"score": 0, "label": "neutral", "reason": "API超时"}
-        except httpx.RequestError as e:
-            logger.error(f"Sentiment API request error: {e}")
-            return {"score": 0, "label": "neutral", "reason": "网络错误"}
-        except json.JSONDecodeError as e:
-            logger.error(f"Sentiment JSON decode error: {e}")
-            return {"score": 0, "label": "neutral", "reason": "JSON解析失败"}
         except Exception as e:
-            logger.error(f"Sentiment analyze error: {e}")
+            logger.error(f"Sentiment API analyze error: {e}")
             return {"score": 0, "label": "neutral", "reason": "分析失败"}
 
     def _extract_json(self, text: str) -> str:
-        """从 AI 返回内容中提取 JSON（处理 markdown 代码块）"""
+        """从 AI 返回内容中提取 JSON"""
+        import re
         text = text.strip()
 
-        # 尝试匹配 ```json ... ``` 或 ``` ... ```
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
         if json_match:
             return json_match.group(1).strip()
 
-        # 尝试匹配 { ... } 对象
         brace_match = re.search(r'\{[\s\S]*\}', text)
         if brace_match:
             return brace_match.group(0)
@@ -107,87 +142,13 @@ class SentimentAnalyzer:
         return text
 
     async def batch_analyze(self, contents: list[str]) -> list[dict]:
-        """批量分析
-
-        将多条内容合并为一次 API 调用以节省成本
-        """
+        """批量分析"""
         if not contents:
             return []
 
-        # 合并内容
-        combined = "\n---\n".join([f"【{i+1}】{c[:1000]}" for i, c in enumerate(contents)])
-        prompt = f"""你是一个专业的舆情分析师。请分析以下{len(contents)}条内容的情感倾向。
-
-重要判断标准：
-1. 仅仅是报道事实（如公司财报、产品发布）应判断为"neutral"
-2. 只有当文章明确批评、指责、曝光负面问题，或报道该主体的违法违规行为时，才判断为"negative"
-3. 当文章赞扬、推荐、正面评价该主体时，判断为"positive"
-
-【内容】
-{combined}
-
-请返回严格的 JSON 数组格式（不要包含其他文字）:
-[{{"score": -1到1的数字, "label": "positive或neutral或negative"}}, ...]"""
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "model": "qwen3-max",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.1,
-            "max_tokens": 1000
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    self.base_url,
-                    headers=headers,
-                    json=payload,
-                )
-
-                if response.status_code != 200:
-                    logger.error(f"Sentiment batch API error: status={response.status_code}")
-                    return [{"score": 0, "label": "neutral"} for _ in contents]
-
-                data = response.json()
-
-            content_text = data.get("choices", [{}])[0].get("message", {}).get("content", "[]")
-
-            # 清理并解析 JSON
-            cleaned = self._extract_json_array(content_text)
-            results = json.loads(cleaned)
-            return results
-        except httpx.TimeoutException:
-            logger.error("Sentiment batch API timeout")
-            return [{"score": 0, "label": "neutral"} for _ in contents]
-        except httpx.RequestError as e:
-            logger.error(f"Sentiment batch API request error: {e}")
-            return [{"score": 0, "label": "neutral"} for _ in contents]
-        except json.JSONDecodeError as e:
-            logger.error(f"Sentiment batch JSON decode error: {e}")
-            return [{"score": 0, "label": "neutral"} for _ in contents]
-        except Exception as e:
-            logger.error(f"Sentiment batch analyze error: {e}")
-            return [{"score": 0, "label": "neutral"} for _ in contents]
-
-    def _extract_json_array(self, text: str) -> str:
-        """从 AI 返回内容中提取 JSON 数组"""
-        text = text.strip()
-
-        # 尝试匹配 ```json ... ``` 或 ``` ... ```
-        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
-        if json_match:
-            return json_match.group(1).strip()
-
-        # 尝试匹配 [ ... ] 数组
-        bracket_match = re.search(r'\[[\s\S]*\]', text)
-        if bracket_match:
-            return bracket_match.group(0)
-
-        return text
+        # 使用本地分析处理批量（更快且免费）
+        results = []
+        for content in contents:
+            result = await self._local_analyze(content)
+            results.append({"score": result["score"], "label": result["label"]})
+        return results

@@ -83,9 +83,10 @@ def get_baidu_collector():
 
 
 def get_sentiment_analyzer():
-    """获取情感分析器实例"""
-    if "sentiment" not in _collectors and settings.bailian_api_key:
-        _collectors["sentiment"] = SentimentAnalyzer(settings.bailian_api_key)
+    """获取情感分析器实例（默认使用本地免费模式）"""
+    if "sentiment" not in _collectors:
+        # 默认使用本地免费模式（snownlp）
+        _collectors["sentiment"] = SentimentAnalyzer(use_local=True)
     return _collectors.get("sentiment")
 
 

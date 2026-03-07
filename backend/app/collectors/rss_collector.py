@@ -148,6 +148,11 @@ class RSSCollector:
                 or entry.get("content", [{}])[0].get("value", "")
             )
 
+            # 清理乱码字符 (Unicode 私有使用区字符)
+            import re
+            content = re.sub(r'[\ue000-\uf8ff\udb80-\udbff]', '', content)
+            title = re.sub(r'[\ue000-\uf8ff\udb80-\udbff]', '', title)
+
             # 提取链接
             url = entry.get("link", "")
             if not url:

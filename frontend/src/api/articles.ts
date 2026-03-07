@@ -70,6 +70,9 @@ export const articlesApi = {
 
   get: (id: string) => request.get<Article>(`/articles/${id}`),
 
+  // 获取来源列表（用于筛选器）
+  getSourcesList: () => request.get<string[]>('/articles/sources'),
+
   // 统计 API
   getStatsOverview: () => request.get<StatsOverview>('/articles/stats/overview'),
 

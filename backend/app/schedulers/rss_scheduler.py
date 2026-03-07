@@ -34,12 +34,14 @@ def get_rss_collector() -> RSSCollector:
     return _rss_collector
 
 
-def get_sentiment_analyzer() -> Optional[SentimentAnalyzer]:
-    """获取情感分析器实例"""
+def get_sentiment_analyzer() -> SentimentAnalyzer:
+    """获取情感分析器实例（默认使用本地免费模式）"""
     global _sentiment_analyzer
-    if _sentiment_analyzer is None and settings.bailian_api_key:
+    if _sentiment_analyzer is None:
         try:
-            _sentiment_analyzer = SentimentAnalyzer(settings.bailian_api_key)
+            # 默认使用本地免费分析，无需 API Key
+            _sentiment_analyzer = SentimentAnalyzer(use_local=True)
+            logger.info("Sentiment analyzer initialized (local mode)")
         except Exception as e:
             logger.error(f"Failed to initialize Sentiment analyzer: {e}")
     return _sentiment_analyzer

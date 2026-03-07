@@ -18,7 +18,7 @@ router = APIRouter()
 class ArticleResponse(BaseModel):
     """文章响应"""
     id: str
-    keyword_id: str
+    keyword_id: Optional[str] = None  # RSS 订阅可以为空
     title: str
     content: Optional[str]
     url: str
@@ -67,7 +67,8 @@ async def list_articles(
         query = query.filter(Article.publish_time <= end_date)
 
     total = query.count()
-    items = query.offset((page - 1) * size).limit(size).all()
+    # 按发布时间倒序排列（最新的在前，空值放最后）
+    items = query.order_by(Article.publish_time.desc()).offset((page - 1) * size).limit(size).all()
 
     return ArticleListResponse(
         items=items,
@@ -75,6 +76,15 @@ async def list_articles(
         page=page,
         size=size
     )
+
+
+@router.get("/sources", response_model=List[str])
+async def get_sources(db: Session = Depends(get_db)):
+    """获取所有来源列表（用于筛选器）"""
+    results = db.query(Article.source).filter(
+        Article.source.isnot(None)
+    ).distinct().order_by(Article.source).all()
+    return [r[0] for r in results if r[0]]
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)
@@ -198,6 +208,15 @@ async def get_trend(
     ]
 
     return TrendResponse(data=data)
+
+
+@router.get("/sources", response_model=List[str])
+async def get_sources(db: Session = Depends(get_db)):
+    """获取所有来源列表（用于筛选器）"""
+    results = db.query(Article.source).filter(
+        Article.source.isnot(None)
+    ).distinct().order_by(Article.source).all()
+    return [r[0] for r in results if r[0]]
 
 
 @router.get("/stats/sources", response_model=List[SourceDistribution])

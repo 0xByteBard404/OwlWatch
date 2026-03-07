@@ -10,7 +10,7 @@ class Article(Base):
     __tablename__ = "articles"
 
     id = Column(String(36), primary_key=True)
-    keyword_id = Column(String(36), nullable=False, index=True)
+    keyword_id = Column(String(36), nullable=True, index=True)  # RSS 订阅可以为空
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=True)
     url = Column(String(500), nullable=False)
