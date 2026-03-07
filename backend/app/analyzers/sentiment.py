@@ -51,8 +51,8 @@ class SentimentAnalyzer:
             self.hanlp = None
 
         try:
-            from cmotion import Cmotion
-            self.cemotion = Cmotion()
+            from Cemotion import Cemotion
+            self.cemotion = Cemotion()
             logger.info("Cemotion 初始化成功")
         except Exception as e:
             logger.warning(f"Cemotion 初始化失败: {e}")
@@ -200,12 +200,16 @@ class SentimentAnalyzer:
             return {"score": 0, "label": "neutral", "confidence": 0}
 
         try:
-            result = self.cmotion.analyze(text)
-            return {
-                "score": result.get("score", 0),
-                "label": result.get("label", "neutral"),
-                "confidence": result.get("confidence", 0.5)
-            }
+            # Cemotion 的 predict() 返回字符串: "正面", "负面", "中性"
+            sentiment_str = self.cemotion.predict(text)
+
+            # 将字符串结果转换为数值分数
+            if sentiment_str == "正面":
+                return {"score": 0.6, "label": "positive", "confidence": 0.7}
+            elif sentiment_str == "负面":
+                return {"score": -0.6, "label": "negative", "confidence": 0.7}
+            else:
+                return {"score": 0, "label": "neutral", "confidence": 0.5}
         except Exception as e:
             logger.error(f"Cemotion analyze error: {e}")
             return {"score": 0, "label": "neutral", "confidence": 0}

@@ -41,8 +41,8 @@ class SentimentAnalyzer:
             self.hanlp = None
 
         try:
-            from cmotion import Cmotion
-            self.cemotion = Cmotion()
+            from Cemotion import Cemotion
+            self.cemotion = Cemotion()
             logger.info("Cemotion 初始化成功")
         except Exception as e:
             logger.warning(f"Cemotion 初始化失败，使用备用方案: {e}")
@@ -90,7 +90,7 @@ class SentimentAnalyzer:
         matched_negative = self._match_keywords(cleaned_text, negative_keywords or [])
 
         # 4. Cemotion 情感分析
-        emotion_result = self._cmotion_analyze(cleaned_text)
+        emotion_result = self._cemotion_analyze(cleaned_text)
 
         # 5. 综合评分
         final_result = self._calculate_final_score(
@@ -164,7 +164,7 @@ class SentimentAnalyzer:
 
         return result
 
-    def _cmotion_analyze(self, text: str) -> Dict:
+    def _cemotion_analyze(self, text: str) -> Dict:
         """Cemotion 情感分析"""
         result = {
             'score': 0.0,
@@ -175,14 +175,18 @@ class SentimentAnalyzer:
             return result
 
         try:
-            score = self.cmotion.analyze(text)
-            result['score'] = score
+            # Cemotion 的 predict() 返回字符串: "正面", "负面", "中性"
+            sentiment_str = self.cemotion.predict(text)
 
-            if score > 0.3:
+            # 将字符串结果转换为数值分数
+            if sentiment_str == "正面":
+                result['score'] = 0.6
                 result['sentiment'] = 'positive'
-            elif score < -0.3:
+            elif sentiment_str == "负面":
+                result['score'] = -0.6
                 result['sentiment'] = 'negative'
             else:
+                result['score'] = 0.0
                 result['sentiment'] = 'neutral'
 
         except Exception as e:
