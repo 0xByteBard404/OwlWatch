@@ -272,6 +272,21 @@ onMounted(() => {
       </button>
     </div>
 
+    <!-- RSS 订阅提示 -->
+    <div class="tip-card">
+      <div class="tip-content">
+        <span class="tip-icon">💡</span>
+        <div class="tip-text">
+          <span class="tip-title">推荐使用 RSS 订阅采集情报</span>
+          <span class="tip-desc">RSS 订阅自动定时获取最新内容，稳定可靠且完全免费。此处的 API 搜索为补充功能。</span>
+        </div>
+      </div>
+      <button class="tip-btn" @click="$router.push('/rss')">
+        <el-icon><Promotion /></el-icon>
+        前往订阅
+      </button>
+    </div>
+
     <!-- Active Tasks -->
     <div v-if="collectTasks.size > 0" class="tasks-panel cyber-card">
       <div class="panel-header">
@@ -1037,6 +1052,74 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* Tip Card */
+.tip-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(168, 85, 247, 0.03));
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.tip-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tip-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.tip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tip-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a855f7;
+  letter-spacing: 0.05em;
+}
+
+.tip-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.tip-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(168, 85, 247, 0.15));
+  border: 1px solid #a855f7;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: #a855f7;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tip-btn:hover {
+  background: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
 }
 
 @keyframes pulse {

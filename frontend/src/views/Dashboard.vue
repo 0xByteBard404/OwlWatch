@@ -519,6 +519,11 @@ onMounted(async () => {
         </div>
       </div>
       <div class="actions-grid">
+        <button class="action-btn action-rss" @click="$router.push('/rss')">
+          <el-icon :size="24"><Promotion /></el-icon>
+          <span>RSS 订阅</span>
+          <span class="action-hint">主力采集</span>
+        </button>
         <button class="action-btn action-primary" @click="$router.push('/keywords')">
           <el-icon :size="24"><Plus /></el-icon>
           <span>添加监控主体</span>
@@ -531,10 +536,6 @@ onMounted(async () => {
         <button class="action-btn action-default" @click="$router.push('/articles')">
           <el-icon :size="24"><Document /></el-icon>
           <span>浏览情报库</span>
-        </button>
-        <button class="action-btn action-default" @click="$router.push('/negative-keywords')">
-          <el-icon :size="24"><Warning /></el-icon>
-          <span>负面词库</span>
         </button>
       </div>
     </div>
@@ -787,6 +788,29 @@ onMounted(async () => {
 
 .action-btn.action-warning:hover {
   box-shadow: var(--glow-orange);
+}
+
+.action-btn.action-rss {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.08));
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #a855f7;
+}
+
+.action-btn.action-rss:hover {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+  border-color: #a855f7;
+}
+
+.action-hint {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 0.6rem;
+  padding: 2px 6px;
+  background: rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  color: #a855f7;
+  letter-spacing: 0.05em;
 }
 
 .badge {
