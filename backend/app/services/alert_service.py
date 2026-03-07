@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..models.alert import Alert
 from ..models.article import Article
 from ..models.keyword import Keyword
+from ..models.sentiment_keyword import SentimentKeyword
 from ..config import settings
 from ..analyzers.sentiment import SentimentAnalyzer
 from ..utils.timezone import now_cst
@@ -29,21 +30,58 @@ class AlertRule:
 class AlertService:
     """预警服务"""
 
-    # 敏感词列表
-    SENSITIVE_WORDS = [
-        "投诉", "维权", "诈骗", "欺诈", "跑路",
-        "倒闭", "破产", "起诉", "违法", "违规",
-        "非法", "涉案", "被查", "处罚", "罚款",
-        "曝光", "黑幕", "内幕", "黑平台", "传销",
-        "套现", "洗钱", "非法集资", "庞氏骗局"
-    ]
+    # 从数据库加载的情感关键词（缓存）
+    _positive_keywords_cache: List[str] = []
+    _negative_keywords_cache: List[str] = []
+    _keywords_cache_time: datetime = None
+
+    def _get_sentiment_keywords(self) -> tuple:
+        """从数据库加载情感关键词（带缓存）"""
+        # 缓存有效期 1 小时
+        if (self._keywords_cache_time and
+            (now_cst() - self._keywords_cache_time).total_seconds() < 3600):
+            return self._positive_keywords_cache, self._negative_keywords_cache
+
+        try:
+            # 从数据库加载正面关键词
+            positive_kws = self.db.query(SentimentKeyword).filter(
+                SentimentKeyword.sentiment_type == 'positive',
+                SentimentKeyword.is_active == True
+            ).all()
+            self._positive_keywords_cache = [kw.keyword for kw in positive_kws]
+
+            # 从数据库加载负面关键词
+            negative_kws = self.db.query(SentimentKeyword).filter(
+                SentimentKeyword.sentiment_type == 'negative',
+                SentimentKeyword.is_active == True
+            ).all()
+            self._negative_keywords_cache = [kw.keyword for kw in negative_kws]
+
+            self._keywords_cache_time = now_cst()
+            logger.info(f"已加载情感关键词: 正面 {len(self._positive_keywords_cache)} 个, 负面 {len(self._negative_keywords_cache)} 个")
+
+            return self._positive_keywords_cache, self._negative_keywords_cache
+        except Exception as e:
+            logger.error(f"加载情感关键词失败: {e}")
+            # 使用备用关键词
+            return [], self._get_fallback_negative_keywords()
+
+    def _get_fallback_negative_keywords(self) -> List[str]:
+        """备用负面关键词（数据库加载失败时使用）"""
+        return [
+            "投诉", "维权", "诈骗", "欺诈", "跑路",
+            "倒闭", "破产", "起诉", "违法", "违规",
+            "非法", "涉案", "被查", "处罚", "罚款",
+            "曝光", "黑幕", "内幕", "黑平台", "传销",
+            "套现", "洗钱", "非法集资", "庞氏骗局"
+        ]
 
     def __init__(self, db: Session):
         self.db = db
         # 从配置读取阈值
         self.negative_threshold = settings.alert_negative_threshold
         self.volume_threshold = settings.alert_volume_threshold
-        self.sentiment_analyzer = SentimentAnalyzer(settings.bailian_api_key) if settings.bailian_api_key else None
+        self.sentiment_analyzer = SentimentAnalyzer()  # 使用新的 HanLP + Cemotion 分析器
         self.http_client = httpx.AsyncClient(timeout=30.0)
 
         # 构建预警规则（使用配置的阈值）
@@ -151,7 +189,7 @@ class AlertService:
             content = article.content or ""
             title = article.title or ""
 
-            for word in self.SENSITIVE_WORDS:
+            for word in self._get_active_negative_keywords():
                 if word in content or word in title:
                     # 检查是否已经预警过（同一文章+同一敏感词）
                     combination = (article.id, word)

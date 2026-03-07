@@ -1,41 +1,280 @@
-"""情感分析器 - 支持本地免费分析（snownlp）和 API 分析"""
+# -*- coding: utf-8 -*-
+"""
+情感分析器 - 整合 HanLP + Cemotion + 情感关键词库
+
+功能:
+1. HanLP: 分词、命名实体识别、关键词提取
+2. Cemotion: 整体情感倾向分析
+3. 情感关键词库: 正面/负面关键词匹配
+4. 综合评分: 结合多维度给出最终情感判断
+"""
 import logging
-from typing import Optional
-from snownlp import SnowNLP
+import re
+from typing import List, Dict, Optional, Any
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class SentimentAnalyzer:
-    """情感分析器 - 默认使用本地免费方案"""
+    """情感分析器 - 整合 HanLP + Cemotion + 情感关键词库"""
 
     def __init__(self, api_key: Optional[str] = None, use_local: bool = True):
         """
         初始化情感分析器
 
         Args:
-            api_key: API密钥（可选，用于云服务）
-            use_local: 是否使用本地分析（默认True，完全免费）
+            api_key: API密钥（保留兼容性，但优先使用本地方案）
+            use_local: 是否使用本地分析（默认True）
         """
         self.api_key = api_key
         self.use_local = use_local
+        self.hanlp = None
+        self.cemotion = None
+        self._initialized = False
 
-    async def analyze(self, content: str) -> dict:
-        """分析内容情感
+    def _init(self):
+        """延迟初始化 - 首次使用时加载模型"""
+        if self._initialized:
+            return
+
+        try:
+            import hanlp
+            # 使用轻量级模型
+            self.hanlp = hanlp.load(
+                model='FINE_ELECTRA_SMALL_ZH',
+                tasks=['ner', 'pos', 'tok', 'lemma'],
+            )
+            logger.info("HanLP 初始化成功")
+        except Exception as e:
+            logger.warning(f"HanLP 初始化失败: {e}")
+            self.hanlp = None
+
+        try:
+            from cmotion import Cmotion
+            self.cemotion = Cmotion()
+            logger.info("Cemotion 初始化成功")
+        except Exception as e:
+            logger.warning(f"Cemotion 初始化失败: {e}")
+            self.cemotion = None
+
+        self._initialized = True
+
+    async def analyze(self, content: str, positive_keywords: List[str] = None, negative_keywords: List[str] = None) -> dict:
+        """
+        分析内容情感
 
         Args:
             content: 待分析文本
+            positive_keywords: 正面关键词列表（从数据库加载）
+            negative_keywords: 负面关键词列表（从数据库加载）
 
         Returns:
-            {"score": -1~1, "label": "positive/neutral/negative", "reason": "..."}
+            {
+                "score": -1~1,
+                "label": "positive/neutral/negative",
+                "reason": "...",
+                "matched_positive": [...],
+                "matched_negative": [...],
+                "entities": [...]
+            }
         """
+        # 凶迟初始化
+        self._init()
+
         if not content or len(content.strip()) < 10:
             return {"score": 0, "label": "neutral", "reason": "内容太短"}
 
-        if self.use_local:
-            return await self._local_analyze(content)
+        # 文本预处理
+        text = self._preprocess_text(content)
+
+        # 1. HanLP 分析
+        hanlp_result = self._hanlp_analyze(text)
+
+        # 2. 关键词匹配
+        matched_positive, matched_negative = self._match_keywords(
+            text, positive_keywords or [], negative_keywords or []
+        )
+
+        # 3. Cemotion 情感分析
+        emotion_result = self._cemotion_analyze(text)
+
+        # 4. 综合评分
+        final_result = self._calculate_final_score(
+            matched_positive, matched_negative, emotion_result, hanlp_result
+        )
+
+        return {
+            "score": final_result["score"],
+            "label": final_result["label"],
+            "reason": final_result["reason"],
+            "matched_positive": matched_positive,
+            "matched_negative": matched_negative,
+            "entities": hanlp_result.get("entities", []),
+        }
+
+    def _preprocess_text(self, text: str) -> str:
+        """文本预处理"""
+        if not text:
+            return ""
+        # 去除 HTML 标签
+        text = re.sub(r'<[^>]+>', '', text)
+        # 去除特殊字符，保留中文、英文、数字、标点
+        text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9\s\u3000-\u303f\uff0c.,!?;:\'""]+', ' ', text)
+        # 合并多个空格
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+
+    def _hanlp_analyze(self, text: str) -> dict:
+        """HanLP 分析 - 分词 + 命名实体识别"""
+        result = {
+            'tokens': [],
+            'entities': [],
+            'pos_tags': [],
+        }
+
+        if not text or not self.hanlp:
+            return result
+
+        try:
+            # 分词
+            tokens = list(self.hanlp.segment(text))
+            result['tokens'] = [str(t) for t in tokens]
+
+            # 命名实体识别
+            try:
+                ner_result = self.hanlp.ner(text)
+                for entity in ner_result:
+                    entity_text = entity.get('text', '') or entity.get('entity', '')
+                    entity_type = entity.get('type', 'UNKNOWN')
+                    if entity_text:
+                        result['entities'].append({
+                            'text': entity_text,
+                            'type': entity_type
+                        })
+            except Exception as e:
+                logger.debug(f"NER failed: {e}")
+
+            # 词性标注
+            try:
+                pos_result = self.hanlp.pos(text)
+                result['pos_tags'] = [(str(w), tag) for w, tag in zip(pos_result, pos_result[1])]
+            except Exception as e:
+                logger.debug(f"POS failed: {e}")
+
+        except Exception as e:
+            logger.error(f"HanLP analyze error: {e}")
+
+        return result
+
+    def _match_keywords(
+        self,
+        text: str,
+        positive_keywords: List[str],
+        negative_keywords: List[str]
+    ) -> tuple:
+        """关键词匹配"""
+        matched_positive = []
+        matched_negative = []
+
+        if not text:
+            return matched_positive, matched_negative
+
+        text_lower = text.lower()
+
+        # 匹配正面关键词
+        for kw in positive_keywords:
+            if kw.lower() in text_lower:
+                matched_positive.append(kw)
+
+        # 匹配负面关键词
+        for kw in negative_keywords:
+            if kw.lower() in text_lower:
+                matched_negative.append(kw)
+
+        return matched_positive, matched_negative
+
+    def _cemotion_analyze(self, text: str) -> dict:
+        """Cemotion 情感分析"""
+        if not text or not self.cemotion:
+            return {"score": 0, "label": "neutral", "confidence": 0}
+
+        try:
+            result = self.cmotion.analyze(text)
+            return {
+                "score": result.get("score", 0),
+                "label": result.get("label", "neutral"),
+                "confidence": result.get("confidence", 0.5)
+            }
+        except Exception as e:
+            logger.error(f"Cemotion analyze error: {e}")
+            return {"score": 0, "label": "neutral", "confidence": 0}
+
+    def _calculate_final_score(
+        self,
+        matched_positive: List[str],
+        matched_negative: List[str],
+        emotion_result: dict,
+        hanlp_result: dict
+    ) -> dict:
+        """
+        综合评分算法
+
+        权重分配:
+        - 关键词匹配: 40%
+        - Cemotion情感分: 60%
+        """
+        # 1. 关键词得分
+        keyword_score = 0.0
+        keyword_score += len(matched_positive) * 0.15  # 每个正面词 +0.15
+        keyword_score -= len(matched_negative) * 0.15  # 每个负面词 -0.15
+        keyword_score = max(-1.0, min(1.0, keyword_score))  # 限制在 -1.0 ~ 1.0
+
+        # 2. 情感分
+        emotion_score = emotion_result.get('score', 0.0)
+
+        # 3. 综合计算
+        # 权重: 关键词 40%, 情感 60%
+        final_score = keyword_score * 0.4 + emotion_score * 0.6
+
+        # 4. 置信度计算
+        confidence = 0.5  # 基础置信度
+        if matched_positive or matched_negative:
+            confidence += 0.2
+        if emotion_result.get('score', 0) != 0:
+            confidence += 0.2
+        if hanlp_result.get('entities'):
+            confidence += 0.1
+        confidence = min(1.0, confidence)
+
+        # 5. 最终判断
+        if final_score > 0.2:
+            sentiment_type = 'positive'
+            reason = f"综合评分 {final_score:.2f}，正面关键词: {matched_positive}"
+        elif final_score < -0.2:
+            sentiment_type = 'negative'
+            reason = f"综合评分 {final_score:.2f}，负面关键词: {matched_negative}"
         else:
-            return await self._api_analyze(content)
+            sentiment_type = 'neutral'
+            reason = f"综合评分 {final_score:.2f}"
+
+        return {
+            'score': round(final_score, 3),
+            'label': sentiment_type,
+            'reason': reason,
+            'confidence': round(confidence, 2)
+        }
+
+    async def batch_analyze(self, contents: List[str]) -> List[dict]:
+        """批量分析"""
+        if not contents:
+            return []
+
+        results = []
+        for content in contents:
+            result = await self.analyze(content)
+            results.append(result)
+        return results
 
     async def _local_analyze(self, content: str) -> dict:
         """使用 snownlp 本地分析（免费）"""
