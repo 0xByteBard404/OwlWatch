@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Redis 服务模块 - 用于分布式任务状态存储"""
+"""Redis 服务模块 - 用于分布式任务状态存储和消息队列"""
 import json
 import logging
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 import redis.asyncio as redis
 from app.config import settings
 
@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 # Redis 连接池
 _redis_client: Optional[redis.Redis] = None
+
+# 队列名称
+SENTIMENT_QUEUE = "owlwatch:sentiment_queue"
 
 
 async def get_redis() -> redis.Redis:
@@ -38,6 +41,94 @@ async def close_redis():
         await _redis_client.close()
         _redis_client = None
         logger.info("Redis connection closed")
+
+
+class SentimentQueue:
+    """情感分析消息队列"""
+
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
+        self.queue_key = SENTIMENT_QUEUE
+
+    async def push(self, article_id: str) -> bool:
+        """推送文章ID到队列"""
+        try:
+            await self.redis.rpush(self.queue_key, article_id)
+            logger.debug(f"Pushed article {article_id} to sentiment queue")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to push to sentiment queue: {e}")
+            return False
+
+    async def push_batch(self, article_ids: List[str]) -> bool:
+        """批量推送文章ID到队列"""
+        if not article_ids:
+            return True
+        try:
+            await self.redis.rpush(self.queue_key, *article_ids)
+            logger.debug(f"Pushed {len(article_ids)} articles to sentiment queue")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to push batch to sentiment queue: {e}")
+            return False
+
+    async def pop_batch(self, batch_size: int = 20, timeout: int = 5) -> List[str]:
+        """
+        批量取出文章ID（阻塞式）
+
+        Args:
+            batch_size: 批量大小
+            timeout: 阻塞超时时间（秒）
+
+        Returns:
+            文章ID列表
+        """
+        try:
+            # 使用 pipeline 批量获取
+            article_ids = []
+            for _ in range(batch_size):
+                # 非阻塞式从队列左侧取出
+                result = await self.redis.lpop(self.queue_key)
+                if result is None:
+                    break
+                article_ids.append(result)
+
+            if article_ids:
+                logger.debug(f"Popped {len(article_ids)} articles from sentiment queue")
+            return article_ids
+        except Exception as e:
+            logger.error(f"Failed to pop from sentiment queue: {e}")
+            return []
+
+    async def size(self) -> int:
+        """获取队列长度"""
+        try:
+            return await self.redis.llen(self.queue_key)
+        except Exception as e:
+            logger.error(f"Failed to get queue size: {e}")
+            return 0
+
+    async def clear(self) -> bool:
+        """清空队列"""
+        try:
+            await self.redis.delete(self.queue_key)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to clear queue: {e}")
+            return False
+
+
+# 全局队列实例
+_sentiment_queue: Optional[SentimentQueue] = None
+
+
+async def get_sentiment_queue() -> SentimentQueue:
+    """获取情感分析队列实例"""
+    global _sentiment_queue
+    if _sentiment_queue is None:
+        redis_client = await get_redis()
+        _sentiment_queue = SentimentQueue(redis_client)
+    return _sentiment_queue
 
 
 class TaskStore:

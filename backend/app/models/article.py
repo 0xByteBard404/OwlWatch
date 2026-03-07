@@ -21,6 +21,8 @@ class Article(Base):
     source_api = Column(String(20), nullable=True)  # bocha/tavily/anspire
     sentiment_score = Column(Float, nullable=True)  # -1 到 1
     sentiment_label = Column(String(20), nullable=True)  # positive/negative/neutral
+    sentiment_status = Column(String(20), default="pending", index=True)  # pending/processing/done/failed
+    sentiment_analyzed_at = Column(SQLDateTime, nullable=True)  # 情感分析完成时间
     publish_time = Column(SQLDateTime, nullable=True)
     collect_time = Column(SQLDateTime, default=now_cst)
     extra = Column(Text, nullable=True)  # JSON 扩展字段
