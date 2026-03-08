@@ -159,6 +159,15 @@ async def process_pending_articles():
             await process_sentiment_batch()
     finally:
         db.close()
+async def _log_queue_size():
+    """异步获取并记录队列大小"""
+    try:
+        queue = await get_sentiment_queue()
+        size = await queue.size()
+        logger.info(f"情感分析 Worker 已启动, 当前队列大小: {size}")
+    except Exception as e:
+        logger.info(f"情感分析 Worker 已启动 (Redis 未连接: {e})")
+
 def start_sentiment_worker():
     """启动情感分析 Worker"""
     # 每 30 秒处理一次队列
@@ -176,17 +185,12 @@ def start_sentiment_worker():
         replace_existing=True,
     )
     sentiment_scheduler.start()
-    # 获取队列大小
+    # 异步获取队列大小用于日志
     try:
-        loop = asyncio.get_event_loop()
-        queue = await get_sentiment_queue()
-        size = await queue.size()
-        logger.info(f"情感分析 Worker 已启动, 当前队列大小: {size}")
-    except Exception as e:
-        logger.info(f"情感分析 Worker 已启动 (Redis 未连接)")
-    except Exception as e:
-        logger.error(f"获取队列大小失败: {e}")
-    logger.info("情感分析 Worker 已启动")
+        asyncio.run(_log_queue_size())
+    except RuntimeError:
+        # 事件循环已在运行（如 APScheduler 环境），跳过队列大小日志
+        logger.info("情感分析 Worker 已启动")
 def stop_sentiment_worker():
     """停止情感分析 Worker"""
     if sentiment_scheduler.running:
