@@ -1,0 +1,138 @@
+# ============================================
+# OwlWatch 舰情监控系统 - Docker Compose (国内加速版)
+# 使用方法: docker compose -f docker-compose-cn.yml up -d
+# ============================================
+# 
+# 此配置使用国内镜像源加速：
+# - Docker 基础镜像: docker.1ms.run
+# - pip: 清华大学镜像
+# - apt: 清华大学镜像
+# - npm: npmmirror 淘宝镜像
+# ============================================
+
+services:
+  # ==================== PostgreSQL 数据库 ====================
+  postgres:
+    image: docker.1ms.run/library/postgres:16-alpine
+    container_name: owlwatch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-owlwatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-owlwatch123}
+      POSTGRES_DB: ${POSTGRES_DB:-owlwatch}
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - owlwatch_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-owlwatch} -d ${POSTGRES_DB:-owlwatch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== Redis 缓存 ====================
+  redis:
+    image: docker.1ms.run/library/redis:7-alpine
+    container_name: owlwatch-redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - owlwatch_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== RSSHub RSS 生成服务 ====================
+  rsshub:
+    image: docker.1ms.run/diygod/rsshub:latest
+    container_name: owlwatch-rsshub
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      CACHE_TYPE: redis
+      REDIS_URL: redis://redis:6379/1
+      # 浏览器配置（用于动态渲染页面）
+      PUPPETEER_WS_ENDPOINT: ""
+      # 请求配置
+      REQUEST_TIMEOUT: 30000
+      # 日志级别
+      LOG_LEVEL: warn
+      TZ: Asia/Shanghai
+    networks:
+      - owlwatch_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1200/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ==================== 后端 API 服务 ====================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.cn
+    container_name: owlwatch-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Docker 环境下覆盖数据库连接地址
+      DATABASE_URL: postgresql://${POSTGRES_USER:-owlwatch}:${POSTGRES_PASSWORD:-owlwatch123}@postgres:5432/${POSTGRES_DB:-owlwatch}
+      REDIS_URL: redis://redis:6379/0
+      RSSHUB_URL: http://rsshub:1200
+      APP_ENV: production
+      DEBUG: "false"
+      TZ: Asia/Shanghai
+    networks:
+      - owlwatch_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rsshub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==================== 前端服务 ====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.cn
+    container_name: owlwatch-frontend
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "3080:80"
+    networks:
+      - owlwatch_network
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  owlwatch_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
