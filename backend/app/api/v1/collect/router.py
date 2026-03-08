@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -13,11 +13,14 @@ from app.dependencies import get_db
 from app.database import SessionLocal
 from app.models.keyword import Keyword
 from app.models.article import Article
+from app.models.article_keyword import ArticleKeyword
 from app.models.negative_keyword import NegativeKeyword
+from app.models.rss_feed import RSSFeed
 from app.collectors.bocha import BochaCollector
 from app.collectors.tavily import TavilyCollector
 from app.collectors.anspire import AnspireCollector
 from app.collectors.bing import BingCollector
+from app.collectors.rss_collector import RSSCollector
 from app.utils.timezone import now_cst
 from app.collectors.baidu import BaiduCollector
 from app.collectors.base import CollectRequest
@@ -97,7 +100,8 @@ async def run_collect_task(
     keyword_text: str,
     platforms: List[str],
     time_range: str,
-    negative_mode: bool
+    negative_mode: bool,
+    rss_ids: List[str] = None
 ):
     """后台执行采集任务"""
     # Windows 上设置事件循环策略以支持 Playwright
@@ -115,6 +119,73 @@ async def run_collect_task(
         results = []
         seen_urls = set()  # 去重
 
+        # ==================== 1. 从配置的 RSS 数据源获取文章 ====================
+        if rss_ids:
+            logger.info(f"[Task {task_id}] Fetching from {len(rss_ids)} RSS feeds")
+            await task_store.update(task_id, {"message": "正在获取 RSS 订阅..."})
+
+            rss_collector = RSSCollector()
+            time_range_map = {
+                "oneDay": 1,
+                "threeDays": 3,
+                "oneWeek": 7,
+                "oneMonth": 30,
+                "threeMonths": 90,
+            }
+            days = time_range_map.get(time_range, 1)
+            cutoff_time = now_cst() - timedelta(days=days)
+
+            for feed_id in rss_ids:
+                try:
+                    feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
+                    if not feed or not feed.is_active:
+                        continue
+
+                    # 获取 RSS 内容
+                    feed_results, _, _, _ = await rss_collector.fetch_feed(
+                        feed_url=feed.feed_url,
+                        etag=None,  # 强制获取最新
+                        last_modified=None,
+                        last_entry_id=None,
+                    )
+
+                    # 过滤：标题或内容包含关键词，且在时间范围内
+                    for item in feed_results:
+                        # 时间过滤
+                        if item.publish_time and item.publish_time < cutoff_time:
+                            continue
+
+                        # 关键词过滤
+                        title_match = keyword_text in (item.title or "")
+                        content_match = keyword_text in (item.content or "")
+
+                        # 负面模式：额外匹配负面关键词
+                        if negative_mode and not (title_match or content_match):
+                            negative_keyword_records = db.query(NegativeKeyword).filter(
+                                NegativeKeyword.is_active == True
+                            ).all()
+                            negative_keywords = [kw.keyword for kw in negative_keyword_records]
+                            if not negative_keywords:
+                                negative_keywords = ["违规", "违法", "投诉", "通报", "处罚", "曝光", "被查", "立案", "调查", "维权"]
+                            for neg_word in negative_keywords:
+                                if neg_word in (item.title or "") or neg_word in (item.content or ""):
+                                    title_match = True
+                                    break
+
+                        if title_match or content_match:
+                            if item.url not in seen_urls:
+                                seen_urls.add(item.url)
+                                item.source_type = "rss"
+                                results.append(item)
+
+                    logger.info(f"[Task {task_id}][RSS:{feed.name}] Got {len(feed_results)} items, matched {len([i for i in feed_results if keyword_text in (i.title or '') or keyword_text in (i.content or '')])}")
+
+                except Exception as e:
+                    logger.error(f"[Task {task_id}][RSS:{feed_id}] Error: {e}")
+
+            logger.info(f"[Task {task_id}] RSS total matched: {len(results)}")
+
+        # ==================== 2. API 搜索采集 ====================
         # 采集器映射
         collector_map = {
             "baidu": get_baidu_collector,
@@ -284,21 +355,47 @@ async def run_collect_task(
             elif not item.content or len(item.content.strip()) < 10:
                 logger.debug(f"Skip sentiment analysis: content too short for '{item.title[:30] if item.title else 'N/A'}...")
 
-            # 创建文章记录
-            article = Article(
+            # 确定匹配类型
+            match_type = "both" if title_match and snippet_match else ("title_only" if title_match else "content_only")
+
+            # 检查文章是否已存在（基于 URL）
+            existing_article = db.query(Article).filter(Article.url == item.url).first()
+
+            if existing_article:
+                article = existing_article
+                # 检查关联是否已存在
+                existing_link = db.query(ArticleKeyword).filter(
+                    ArticleKeyword.article_id == article.id,
+                    ArticleKeyword.keyword_id == keyword_id
+                ).first()
+                if existing_link:
+                    continue
+            else:
+                # 创建文章记录（不设置 keyword_id，文章是独立的）
+                article = Article(
+                    id=str(uuid.uuid4()),
+                    title=item.title,
+                    content=item.content,
+                    url=item.url,
+                    source=item.source,
+                    source_api=item.source_type,
+                    sentiment_score=sentiment_score,
+                    sentiment_label=sentiment_label,
+                    publish_time=item.publish_time,
+                    extra=str(item.extra) if item.extra else None
+                )
+                db.add(article)
+                db.flush()  # 获取 article.id
+
+            # 创建文章-关键词关联
+            article_keyword = ArticleKeyword(
                 id=str(uuid.uuid4()),
+                article_id=article.id,
                 keyword_id=keyword_id,
-                title=item.title,
-                content=item.content,
-                url=item.url,
-                source=item.source,
-                source_api=item.source_type,
-                sentiment_score=sentiment_score,
-                sentiment_label=sentiment_label,
-                publish_time=item.publish_time,
-                extra=str(item.extra) if item.extra else None
+                match_type=match_type,
+                matched_at=now_cst()
             )
-            db.add(article)
+            db.add(article_keyword)
             saved_count += 1
 
             # 每10条提交一次，减少锁竞争
@@ -367,6 +464,11 @@ async def trigger_collect(
     if not keyword:
         raise HTTPException(status_code=404, detail="Keyword not found")
 
+    # 从 data_sources 提取 rss_ids
+    rss_ids = []
+    if keyword.data_sources and isinstance(keyword.data_sources, dict):
+        rss_ids = keyword.data_sources.get("rss_ids", [])
+
     # 创建任务（存储到 Redis）
     task_id = str(uuid.uuid4())
     task_store = await get_task_store()
@@ -389,7 +491,8 @@ async def trigger_collect(
         keyword.keyword,
         keyword.platforms or ["bocha", "tavily"],
         time_range,
-        negative_mode
+        negative_mode,
+        rss_ids  # 传递 RSS 数据源 IDs
     )
 
     return CollectTriggerResponse(
@@ -435,6 +538,11 @@ async def trigger_collect_all(background_tasks: BackgroundTasks, db: Session = D
 
     task_ids = []
     for keyword in keywords:
+        # 从 data_sources 提取 rss_ids
+        rss_ids = []
+        if keyword.data_sources and isinstance(keyword.data_sources, dict):
+            rss_ids = keyword.data_sources.get("rss_ids", [])
+
         task_id = str(uuid.uuid4())
         await task_store.create(task_id, {
             "task_id": task_id,
@@ -454,7 +562,8 @@ async def trigger_collect_all(background_tasks: BackgroundTasks, db: Session = D
             keyword.keyword,
             keyword.platforms or ["bocha", "tavily"],
             "oneDay",
-            False
+            False,
+            rss_ids  # 传递 RSS 数据源 IDs
         )
         task_ids.append({"keyword": keyword.keyword, "task_id": task_id})
 

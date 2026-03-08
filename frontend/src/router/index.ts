@@ -19,6 +19,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '监控主体' },
   },
   {
+    path: '/keywords/:id',
+    name: 'KeywordDetail',
+    component: () => import('@/views/KeywordDetail.vue'),
+    meta: { title: '主体详情' },
+  },
+  {
     path: '/sentiment-keywords',
     name: 'SentimentKeywords',
     component: () => import('@/views/SentimentKeywords.vue'),

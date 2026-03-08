@@ -342,7 +342,6 @@ async def create_feed(
         name=data.name,
         feed_url=data.feed_url,
         source_type=data.source_type,
-        keyword_id=data.keyword_id,
         fetch_interval=data.fetch_interval,
     )
 

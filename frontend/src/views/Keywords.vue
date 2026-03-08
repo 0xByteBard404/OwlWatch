@@ -1,30 +1,42 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Download,
   Edit,
   Delete,
   Plus,
+  Promotion,
+  View,
 } from '@element-plus/icons-vue'
 import {
   keywordsApi,
   collectApi,
+  rssApi,
   type Keyword,
   type KeywordCreate,
 } from '@/api'
 
+const router = useRouter()
+
 const keywords = ref<Keyword[]>([])
+const rssFeeds = ref<any[]>([])
 const loading = ref(false)
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加监控主体')
 const formLoading = ref(false)
 
-const form = ref<KeywordCreate>({
+interface FormType extends KeywordCreate {
+  data_sources: { rss_ids: string[] }
+}
+
+const form = ref<FormType>({
   keyword: '',
   priority: 'medium',
-  platforms: ['baidu'],
+  platforms: ['bocha', 'tavily'],
+  data_sources: { rss_ids: [] },
 })
 
 const editingId = ref<string | null>(null)
@@ -65,9 +77,14 @@ const timeRangeOptions = [
 const fetchData = async () => {
   loading.value = true
   try {
-    keywords.value = await keywordsApi.list()
+    const [keywordsRes, rssRes] = await Promise.all([
+      keywordsApi.list(),
+      rssApi.list(),
+    ])
+    keywords.value = keywordsRes
+    rssFeeds.value = rssRes
   } catch (error) {
-    console.error('Failed to fetch keywords:', error)
+    console.error('Failed to fetch data:', error)
   } finally {
     loading.value = false
   }
@@ -80,6 +97,7 @@ const handleCreate = () => {
     keyword: '',
     priority: 'medium',
     platforms: ['bocha', 'tavily'],
+    data_sources: { rss_ids: [] },
   }
   dialogVisible.value = true
 }
@@ -91,6 +109,7 @@ const handleEdit = (row: Keyword) => {
     keyword: row.keyword,
     priority: row.priority,
     platforms: row.platforms,
+    data_sources: { rss_ids: row.data_sources?.rss_ids || [] },
   }
   dialogVisible.value = true
 }
@@ -132,6 +151,10 @@ const handleDelete = async (row: Keyword) => {
       console.error('Failed to delete keyword:', error)
     }
   }
+}
+
+const viewDetail = (row: Keyword) => {
+  router.push(`/keywords/${row.id}`)
 }
 
 const openCollectDialog = (row: Keyword) => {
@@ -367,9 +390,13 @@ onMounted(() => {
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
+              <button class="action-btn detail" @click="viewDetail(row)">
+                <el-icon><View /></el-icon>
+                详情
+              </button>
               <button class="action-btn collect" @click="openCollectDialog(row)">
                 <el-icon><Download /></el-icon>
                 采集
@@ -433,6 +460,28 @@ onMounted(() => {
               />
               <span class="checkbox-indicator"></span>
               <span class="option-label">{{ item.label }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" v-if="rssFeeds.length > 0">
+          <label class="form-label">RSS 数据源</label>
+          <div class="rss-source-list">
+            <label
+              v-for="feed in rssFeeds"
+              :key="feed.id"
+              class="rss-option"
+              :class="{ active: form.data_sources?.rss_ids?.includes(feed.id) }"
+            >
+              <input
+                type="checkbox"
+                :value="feed.id"
+                v-model="form.data_sources.rss_ids"
+                hidden
+              />
+              <span class="checkbox-indicator"></span>
+              <span class="rss-name">{{ feed.name }}</span>
+              <span class="rss-type">{{ feed.source_type }}</span>
             </label>
           </div>
         </div>
@@ -749,6 +798,12 @@ onMounted(() => {
 
 .action-btn:hover {
   transform: translateY(-1px);
+}
+
+.action-btn.detail:hover {
+  border-color: #a855f7;
+  color: #a855f7;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
 }
 
 .action-btn.collect:hover {
@@ -1125,5 +1180,75 @@ onMounted(() => {
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(0.9); }
+}
+
+/* RSS Source List */
+.rss-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rss-source-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.rss-source-list::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+}
+
+.rss-source-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.rss-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rss-option:hover {
+  border-color: var(--neon-cyan);
+}
+
+.rss-option.active {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.1);
+}
+
+.rss-option.active .checkbox-indicator {
+  background: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+}
+
+.rss-option.active .checkbox-indicator::after {
+  opacity: 1;
+}
+
+.rss-name {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.rss-type {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--neon-cyan);
+  text-transform: uppercase;
 }
 </style>

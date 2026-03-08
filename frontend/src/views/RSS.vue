@@ -41,7 +41,6 @@ const form = ref<RSSFeedCreate>({
   name: '',
   feed_url: '',
   source_type: 'generic',
-  keyword_id: undefined,
   fetch_interval: 300,
 })
 
@@ -599,17 +598,6 @@ onMounted(() => {
               :key="item.value"
               :label="`${item.icon} ${item.label}`"
               :value="item.value"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="关联监控主体">
-          <el-select v-model="form.keyword_id" placeholder="可选：关联到监控主体" clearable>
-            <el-option
-              v-for="item in keywords"
-              :key="item.id"
-              :label="item.keyword"
-              :value="item.id"
             />
           </el-select>
         </el-form-item>

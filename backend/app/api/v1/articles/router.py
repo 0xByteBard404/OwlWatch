@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from app.dependencies import get_db
 from app.models.article import Article
+from app.models.article_keyword import ArticleKeyword
 from app.utils.timezone import now_cst
 
 router = APIRouter()
@@ -56,8 +57,14 @@ async def list_articles(
     """Get articles with filters"""
     query = db.query(Article)
 
+    # 通过关联表过滤 keyword_id
     if keyword_id:
-        query = query.filter(Article.keyword_id == keyword_id)
+        # 子查询：获取与该关键词关联的所有文章ID
+        subquery = db.query(ArticleKeyword.article_id).filter(
+            ArticleKeyword.keyword_id == keyword_id
+        ).subquery()
+        query = query.filter(Article.id.in_(subquery))
+
     if sentiment:
         query = query.filter(Article.sentiment_label == sentiment)
     if source:
