@@ -1,11 +1,13 @@
 # OwlWatch 舆情监控系统
 
-基于 **Bocha**、**Tavily**、**Anspire**、**百度**、**Bing** 多源数据采集和 **百炼 qwen3-max** 大模型的智能舆情监控平台。
+基于 **Bocha**、**Tavily**、**Anspire**、**百度**、**Bing** 多源数据采集和 **HanLP + Cemotion** 本地情感分析的智能舆情监控平台。
 
 ## ✨ 功能特性
 
 - 🔍 **多源数据采集** - 整合 Bocha(国内)、Tavily(海外)、Anspire(深度爬取)、百度、Bing 多个数据源
-- 🤖 **AI 智能分析** - 基于百炼 qwen3-max 实现情感分析、摘要生成
+- 📡 **RSS 订阅监控** - 支持 RSS/Atom Feed 自动解析，实时监控目标站点
+- 🤖 **AI 智能分析** - 基于 HanLP + Cemotion 本地情感分析，支持自定义情感关键词
+- ⚡ **异步任务队列** - Redis 队列驱动的异步情感分析，采集与分析解耦
 - 🚨 **智能预警** - 支持负面情感爆发、敏感词命中、讨论量激增等多维度预警
 - 📊 **可视化大屏** - Vue3 + Ant Design Vue 管理后台（赛博朋克风格）
 - 🏢 **多租户支持** - 支持多租户隔离的企业级架构
@@ -18,7 +20,7 @@
 | 后端 | FastAPI + SQLAlchemy + APScheduler |
 | 前端 | Vue3 + Ant Design Vue + ECharts |
 | 数据库 | PostgreSQL + Redis |
-| AI | 百炼 qwen3-max |
+| AI | HanLP + Cemotion (本地情感分析) |
 | 部署 | Docker Compose |
 
 ## 📁 项目结构
@@ -29,9 +31,9 @@ OwlWatch/
 │   ├── app/
 │   │   ├── api/v1/          # API 路由
 │   │   ├── collectors/      # 数据采集器 (Bocha, Tavily, Anspire, Baidu, Bing)
-│   │   ├── analyzers/       # AI 分析器
-│   │   ├── services/        # 业务服务 (Redis 任务存储)
-│   │   ├── schedulers/      # 定时任务
+│   │   ├── analyzers/       # AI 分析器 (情感分析)
+│   │   ├── services/        # 业务服务 (Redis 队列、预警)
+│   │   ├── schedulers/      # 定时任务 (RSS 采集、情感分析 Worker)
 │   │   ├── models/          # 数据模型
 │   │   ├── config.py        # 配置管理
 │   │   ├── database.py      # 数据库连接
@@ -66,7 +68,7 @@ cp backend/.env.example backend/.env
 | Bocha | 国内搜索 | https://open.bochaai.com |
 | Tavily | 海外搜索 | https://tavily.com |
 | Anspire | 深度爬取 | https://anspire.io |
-| 百炼 | AI 分析 | https://bailian.console.aliyun.com |
+| 百炼 | 摘要/趋势分析 (可选) | https://bailian.console.aliyun.com |
 
 ### 3. 启动服务
 
@@ -141,6 +143,23 @@ GET    /api/v1/alerts            # 获取预警列表
 PUT    /api/v1/alerts/{id}/handle # 处理预警
 ```
 
+### RSS 订阅
+```
+GET    /api/v1/rss               # 获取 RSS 订阅列表
+POST   /api/v1/rss               # 添加 RSS 订阅
+PUT    /api/v1/rss/{id}          # 更新 RSS 订阅
+DELETE /api/v1/rss/{id}          # 删除 RSS 订阅
+POST   /api/v1/rss/{id}/fetch    # 手动抓取单个订阅
+```
+
+### 情感关键词
+```
+GET    /api/v1/sentiment-keywords       # 获取情感关键词列表
+POST   /api/v1/sentiment-keywords       # 添加情感关键词
+DELETE /api/v1/sentiment-keywords/{id}  # 删除情感关键词
+GET    /api/v1/sentiment-keywords/categories  # 获取关键词分类
+```
+
 ### 报告生成
 ```
 POST   /api/v1/reports/generate  # 生成报告
@@ -156,7 +175,7 @@ GET    /api/v1/reports           # 获取报告列表
 | frontend | 3080:80 | Nginx 静态文件服务 |
 | backend | 8000 | FastAPI 应用 (2 workers) |
 | postgres | 5432 | PostgreSQL 数据库 |
-| redis | 6379 | Redis 缓存 (任务状态存储) |
+| redis | 6379 | Redis (任务队列 + 状态存储) |
 
 **环境变量配置** (backend/.env)
 
@@ -179,16 +198,16 @@ JWT_SECRET=your_jwt_secret_at_least_32_chars
 
 基于中等规模 (100 个关键词) 的月度成本估算:
 
-| 项目 | 月成本 |
-|------|--------|
-| Bocha API | ¥540 |
-| Tavily API | ¥300 |
-| Anspire API | ¥250 |
-| 百炼 AI | ¥200 |
-| 服务器 | ¥200 |
-| **合计** | **≈ ¥1,490** |
+| 项目 | 月成本 | 说明 |
+|------|--------|------|
+| Bocha API | ¥540 | 国内搜索 |
+| Tavily API | ¥300 | 海外搜索 |
+| Anspire API | ¥250 | 深度爬取 |
+| 百炼 AI | ¥100 | 摘要/趋势分析 (可选) |
+| 服务器 | ¥200 | 云服务器 |
+| **合计** | **≈ ¥1,390** | |
 
-> 对比传统舆情系统 (年费 3-10 万)，成本降低 **85%+**
+> 本地情感分析 (HanLP + Cemotion) 无需 API 费用，对比传统舆情系统 (年费 3-10 万)，成本降低 **85%+**
 
 ## 📈 开发路线
 
@@ -215,6 +234,13 @@ JWT_SECRET=your_jwt_secret_at_least_32_chars
 - [x] Docker 部署配置
 - [x] Redis 任务状态存储
 - [x] 文档完善
+
+### Week 5: RSS + 情感分析增强 ✅
+- [x] RSS/Atom Feed 订阅功能
+- [x] HanLP + Cemotion 本地情感分析
+- [x] 情感关键词管理（正面/负面）
+- [x] Redis 异步情感分析队列
+- [x] 采集与情感分析解耦架构
 
 ## 📄 License
 
