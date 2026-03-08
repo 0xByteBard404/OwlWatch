@@ -628,6 +628,14 @@ RSSHUB_TEMPLATES = {
             {"path": "/cls/depth", "name": "深度", "params": []},
         ]
     },
+    "yicai": {
+        "name": "第一财经",
+        "category": "财经科技",
+        "routes": [
+            {"path": "/yicai/brief", "name": "快讯", "params": []},
+            {"path": "/yicai/news", "name": "资讯", "params": []},
+        ]
+    },
     "solidot": {
         "name": "奇客Solidot",
         "category": "财经科技",
@@ -771,6 +779,14 @@ RSSHUB_TEMPLATES = {
         "category": "新闻媒体",
         "routes": [
             {"path": "/caixin/headlines", "name": "头条", "params": []},
+        ]
+    },
+    "chinanews": {
+        "name": "中国新闻网",
+        "category": "新闻媒体",
+        "routes": [
+            {"path": "/chinanews/news", "name": "滚动新闻", "params": []},
+            {"path": "/chinanews/rollnews", "name": "快讯", "params": []},
         ]
     },
     "guancha": {
