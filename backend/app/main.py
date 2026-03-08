@@ -148,6 +148,36 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Redis 连接失败，任务状态将无法跨进程共享: {e}")
 
+    # 自动初始化情感关键词词库（仅在词库为空时）
+    try:
+        from .database import SessionLocal
+        from .models.sentiment_keyword import SentimentKeyword
+        from .data.default_sentiment_keywords import DEFAULT_SENTIMENT_KEYWORDS
+        import uuid
+
+        db = SessionLocal()
+        try:
+            existing_count = db.query(SentimentKeyword).count()
+            if existing_count == 0:
+                # 词库为空，自动初始化
+                for item in DEFAULT_SENTIMENT_KEYWORDS:
+                    keyword = SentimentKeyword(
+                        id=str(uuid.uuid4()),
+                        keyword=item["keyword"],
+                        sentiment_type=item["sentiment_type"],
+                        category=item["category"],
+                        is_active=True,
+                    )
+                    db.add(keyword)
+                db.commit()
+                logger.info(f"情感关键词词库已自动初始化 ({len(DEFAULT_SENTIMENT_KEYWORDS)} 条)")
+            else:
+                logger.debug(f"情感关键词词库已存在 ({existing_count} 条)，跳过初始化")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"情感关键词词库初始化失败: {e}")
+
     logger.info("OwlWatch 舆情监控系统已启动")
 
 

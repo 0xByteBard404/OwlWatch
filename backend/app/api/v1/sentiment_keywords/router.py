@@ -4,12 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
+import logging
 
 from app.dependencies import get_db
 from app.models.sentiment_keyword import SentimentKeyword
 from pydantic import BaseModel
 
 router = APIRouter(tags=["sentiment-keywords"])
+logger = logging.getLogger(__name__)
 
 
 # Schemas
@@ -202,3 +204,92 @@ async def toggle_keyword(
     db.commit()
 
     return {"message": "状态切换成功", "is_active": keyword.is_active}
+
+
+@router.get("/status")
+async def get_keyword_status(db: Session = Depends(get_db)):
+    """获取情感关键词状态（是否已初始化）"""
+    total_count = db.query(SentimentKeyword).count()
+    negative_count = db.query(SentimentKeyword).filter(
+        SentimentKeyword.sentiment_type == "negative"
+    ).count()
+    positive_count = db.query(SentimentKeyword).filter(
+        SentimentKeyword.sentiment_type == "positive"
+    ).count()
+
+    return {
+        "initialized": total_count > 0,
+        "total": total_count,
+        "negative": negative_count,
+        "positive": positive_count,
+    }
+
+
+@router.post("/init")
+async def init_default_keywords(
+    force: bool = False,
+    db: Session = Depends(get_db),
+):
+    """
+    初始化默认情感关键词词库
+
+    Args:
+        force: 是否强制重新初始化（会清空现有词库）
+    """
+    from app.data.default_sentiment_keywords import DEFAULT_SENTIMENT_KEYWORDS, KEYWORD_STATS
+
+    # 检查是否已有数据
+    existing_count = db.query(SentimentKeyword).count()
+
+    if existing_count > 0 and not force:
+        return {
+            "message": "词库已存在，跳过初始化",
+            "existing_count": existing_count,
+            "hint": "使用 force=true 强制重新初始化",
+        }
+
+    # 强制模式：清空现有词库
+    if force and existing_count > 0:
+        db.query(SentimentKeyword).delete()
+        db.commit()
+        logger.info(f"已清空现有情感关键词词库 ({existing_count} 条)")
+
+    # 批量插入默认关键词
+    inserted_count = 0
+    skipped_count = 0
+
+    for item in DEFAULT_SENTIMENT_KEYWORDS:
+        # 检查是否已存在（防止重复）
+        existing = db.query(SentimentKeyword).filter(
+            SentimentKeyword.keyword == item["keyword"]
+        ).first()
+
+        if existing:
+            skipped_count += 1
+            continue
+
+        keyword = SentimentKeyword(
+            id=str(uuid.uuid4()),
+            keyword=item["keyword"],
+            sentiment_type=item["sentiment_type"],
+            category=item["category"],
+            is_active=True,
+        )
+        db.add(keyword)
+        inserted_count += 1
+
+    db.commit()
+    logger.info(f"情感关键词词库初始化完成: 新增 {inserted_count} 条, 跳过 {skipped_count} 条")
+
+    return {
+        "message": "词库初始化成功",
+        "inserted": inserted_count,
+        "skipped": skipped_count,
+        "stats": KEYWORD_STATS,
+    }
+
+
+@router.post("/reset")
+async def reset_keywords(db: Session = Depends(get_db)):
+    """重置词库到默认状态（清空后重新初始化）"""
+    return await init_default_keywords(force=True, db=db)
