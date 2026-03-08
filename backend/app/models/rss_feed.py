@@ -7,35 +7,50 @@ from ..database import Base
 
 
 class RSSFeed(Base):
-    """RSS 订阅源模型"""
+    """RSS 订阅源模型（独立数据源）"""
     __tablename__ = "rss_feeds"
 
     id = Column(String(36), primary_key=True)
     tenant_id = Column(String(36), nullable=True, index=True)
     
     # 订阅配置
-    name = Column(String(200), nullable=False)  # 订阅名称，如 "微博-特斯拉"
-    feed_url = Column(String(1000), nullable=False)  # RSS URL
+    name = Column(String(200), nullable=False)
+    feed_url = Column(String(1000), nullable=False)
     source_type = Column(String(50), nullable=True)  # weibo/zhihu/bilibili/generic
     
-    # 关联监控主体（可选）
+    # 关联监控主体（已废弃，请在监控主体中配置）
     keyword_id = Column(String(36), nullable=True, index=True)
     
     # 状态
     is_active = Column(Boolean, default=True)
-    last_fetched = Column(SQLDateTime, nullable=True)  # 最后获取时间
-    last_etag = Column(String(100), nullable=True)  # HTTP ETag 缓存
-    last_modified = Column(String(100), nullable=True)  # HTTP Last-Modified 缓存
-    last_entry_id = Column(String(500), nullable=True)  # 最后一条条目的 ID（用于增量获取）
-    fetch_error_count = Column(Integer, default=0)  # 连续错误次数
-    last_error = Column(Text, nullable=True)  # 最后一次错误信息
+    last_fetched = Column(SQLDateTime, nullable=True)
+    last_etag = Column(String(100), nullable=True)
+    last_modified = Column(String(100), nullable=True)
+    last_entry_id = Column(String(500), nullable=True)
+    fetch_error_count = Column(Integer, default=0)
+    last_error = Column(Text, nullable=True)
     
     # 配置
-    fetch_interval = Column(Integer, default=300)  # 轮询间隔（秒），默认 5 分钟
+    fetch_interval = Column(Integer, default=300)
     
     # 统计
-    total_entries = Column(Integer, default=0)  # 累计获取条目数
+    total_entries = Column(Integer, default=0)
     
     # 时间戳
     created_at = Column(SQLDateTime, default=now_cst)
     updated_at = Column(SQLDateTime, default=now_cst, onupdate=now_cst)
+
+    def __repr__(self):
+        return f"<RSSFeed {self.name} ({self.feed_url})>"
+
+
+# 数据库迁移说明
+# 
+# 迁移步骤:
+# 1. 添加 keywords.data_sources 列:
+#    ALTER TABLE keywords ADD COLUMN data_sources TEXT;
+#
+# 2. 清空旧的关联（可选，如果不再需要）:
+#    UPDATE rss_feeds SET keyword_id = NULL;
+#
+# 此字段保留用于向后兼容，但新逻辑通过 keywords.data_sources 管理。

@@ -33,6 +33,11 @@ class Keyword(Base):
     keyword = Column(String(100), nullable=False)
     priority = Column(String(10), default="medium")  # high/medium/low
     platforms = Column(JSONEncodedDict, nullable=True)  # JSON: ["bocha", "tavily"]
+
+    # 数据源配置（核心字段）
+    # 示例: {"rss_ids": ["uuid1", "uuid2"], "search_apis": ["bocha", "tavily"]}
+    data_sources = Column(JSONEncodedDict, nullable=True)
+
     is_active = Column(Boolean, default=True)
     created_at = Column(SQLDateTime, default=now_cst)
     updated_at = Column(SQLDateTime, default=now_cst, onupdate=now_cst)

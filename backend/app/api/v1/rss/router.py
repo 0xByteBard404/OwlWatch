@@ -25,7 +25,7 @@ class RSSFeedCreate(BaseModel):
     name: str = Field(..., description="订阅名称")
     feed_url: str = Field(..., description="RSS 订阅地址")
     source_type: Optional[str] = Field(default="generic", description="来源类型: weibo/zhihu/bilibili/generic")
-    keyword_id: Optional[str] = Field(default=None, description="关联的监控主体 ID")
+    # keyword_id 已废弃，请在监控主体中配置数据源
     fetch_interval: int = Field(default=300, description="轮询间隔（秒）")
 
 
@@ -34,7 +34,6 @@ class RSSFeedUpdate(BaseModel):
     name: Optional[str] = None
     feed_url: Optional[str] = None
     source_type: Optional[str] = None
-    keyword_id: Optional[str] = None
     fetch_interval: Optional[int] = None
     is_active: Optional[bool] = None
 
@@ -45,7 +44,7 @@ class RSSFeedResponse(BaseModel):
     name: str
     feed_url: str
     source_type: Optional[str]
-    keyword_id: Optional[str]
+    # keyword_id 已废弃
     is_active: bool
     last_fetched: Optional[datetime]
     fetch_error_count: int
