@@ -108,6 +108,7 @@ const sourceTypeOptions = [
   { label: 'TikTok', value: 'tiktok', icon: '🎬', category: '视频平台' },
   // 财经科技
   { label: '36氪', value: '36kr', icon: '💼', category: '财经科技' },
+  { label: '第一财经', value: 'yicai', icon: '💹', category: '财经科技' },
   { label: '华尔街见闻', value: 'wallstreetcn', icon: '📈', category: '财经科技' },
   { label: '财联社', value: 'cls', icon: '💰', category: '财经科技' },
   { label: 'Hacker News', value: 'hackernews', icon: '🔶', category: '财经科技' },
@@ -118,6 +119,7 @@ const sourceTypeOptions = [
   { label: 'Reddit', value: 'reddit', icon: '🤖', category: '社区论坛' },
   { label: 'V2EX', value: 'v2ex', icon: '🖥️', category: '社区论坛' },
   // 新闻媒体
+  { label: '中国新闻网', value: 'chinanews', icon: '🇨🇳', category: '新闻媒体' },
   { label: 'BBC', value: 'bbc', icon: '🇬🇧', category: '新闻媒体' },
   { label: 'CNN', value: 'cnn', icon: '🇺🇸', category: '新闻媒体' },
   { label: '纽约时报', value: 'nytimes', icon: '📰', category: '新闻媒体' },
