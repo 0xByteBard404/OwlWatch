@@ -337,35 +337,37 @@ const wordColors = [
   '#f39c12', // 金色
 ]
 
-// 热词云悬停状态
-const hoveredWord = ref<number | null>(null)
+// 热词云暂停状态
+const cloudPaused = ref(false)
 
-// 计算最大词频
-const maxWordCount = computed(() => {
-  if (wordData.value.length === 0) return 0
-  return Math.max(...wordData.value.map(w => w.count))
-})
-
-// 计算词云数据
+// 计算词云数据 - 3D 球形分布
 const wordCloudData = computed(() => {
   if (wordData.value.length === 0) return []
 
   const maxCount = Math.max(...wordData.value.map(w => w.count))
   const minCount = Math.min(...wordData.value.map(w => w.count))
+  const total = wordData.value.slice(0, 25).length
 
-  return wordData.value.slice(0, 30).map((word, index) => {
-    // 根据频率计算字体大小 (14px - 36px)
-    const sizeRange = 22
+  return wordData.value.slice(0, 25).map((word, index) => {
+    // 根据频率计算字体大小 (12px - 32px)
+    const sizeRange = 20
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
-    const fontSize = 14 + normalizedSize * sizeRange
+    const fontSize = 12 + normalizedSize * sizeRange
+
+    // 3D 球形分布 - 使用斐波那契球面分布
+    const phi = Math.acos(-1 + (2 * index + 1) / total)
+    const theta = Math.sqrt(total * Math.PI) * phi
+    const radius = 120 // 球体半径
 
     return {
       word: word.word,
       count: word.count,
       fontSize: Math.round(fontSize),
       color: wordColors[index % wordColors.length],
-      // 随机旋转角度 (-15, 0, 15)
-      rotation: [-15, 0, 0, 0, 15][Math.floor(Math.random() * 5)],
+      // 3D 坐标
+      x: Math.round(radius * Math.cos(theta) * Math.sin(phi)),
+      y: Math.round(radius * Math.sin(theta) * Math.sin(phi)),
+      z: Math.round(radius * Math.cos(phi)),
     }
   })
 })
@@ -499,23 +501,30 @@ onMounted(async () => {
           </div>
         </div>
         <div class="chart-body word-cloud-body">
-          <div v-if="wordCloudData.length > 0" class="word-cloud">
-            <span
-              v-for="(word, index) in wordCloudData"
-              :key="index"
-              class="word-item"
-              :class="{ hot: word.count > maxWordCount * 0.5 }"
-              :style="{
-                fontSize: word.fontSize + 'px',
-                color: word.color,
-                textShadow: `0 2px 8px ${word.color}`,
-              }"
-              @click="searchWord(word)"
-              @mouseenter="hoveredWord = index"
-              @mouseleave="hoveredWord = null"
-            >
-              {{ word.word }}
-            </span>
+          <div
+            v-if="wordCloudData.length > 0"
+            class="word-cloud-3d"
+            :class="{ paused: cloudPaused }"
+            @mouseenter="cloudPaused = true"
+            @mouseleave="cloudPaused = false"
+          >
+            <div class="cloud-sphere">
+              <span
+                v-for="(word, index) in wordCloudData"
+                :key="index"
+                class="word-item-3d"
+                :style="{
+                  fontSize: word.fontSize + 'px',
+                  color: word.color,
+                  textShadow: `0 0 10px ${word.color}, 0 0 20px ${word.color}40`,
+                  transform: `translate3d(${word.x}px, ${word.y}px, ${word.z}px)`,
+                  opacity: (word.z + 120) / 240 * 0.7 + 0.3,
+                }"
+                @click="searchWord(word)"
+              >
+                {{ word.word }}
+              </span>
+            </div>
           </div>
           <div v-else class="empty-state">
             <el-icon :size="48"><Histogram /></el-icon>
@@ -730,46 +739,62 @@ onMounted(async () => {
   height: 320px;
 }
 
-/* 词云样式 */
+/* 3D 词云样式 */
 .word-cloud-body {
   display: flex;
   align-items: center;
   justify-content: center;
+  perspective: 800px;
+  overflow: hidden;
 }
 
-.word-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 12px;
-  padding: 10px;
+.word-cloud-3d {
   width: 100%;
   height: 100%;
-}
-
-.word-item {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  transform-style: preserve-3d;
+}
+
+.cloud-sphere {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  transform-style: preserve-3d;
+  animation: cloud-rotate 20s linear infinite;
+}
+
+.word-cloud-3d.paused .cloud-sphere {
+  animation-play-state: paused;
+}
+
+@keyframes cloud-rotate {
+  from {
+    transform: rotateY(0deg) rotateX(10deg);
+  }
+  to {
+    transform: rotateY(360deg) rotateX(10deg);
+  }
+}
+
+.word-item-3d {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.3s ease;
-  border-radius: 4px;
-  user-select: none;
+  white-space: nowrap;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
 }
 
-.word-item:hover {
-  transform: scale(1.15);
-  background: rgba(0, 240, 255, 0.1);
-}
-
-.word-item.hot {
-  font-weight: 700;
-  animation: pulse-glow 2s ease-in-out infinite;
+.word-item-3d:hover {
+  transform: translate3d(var(--x), var(--y), var(--z)) scale(1.3) !important;
+  z-index: 100;
 }
 
 .chart {
