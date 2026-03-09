@@ -333,6 +333,241 @@ async def test_config(
 
 # ==================== RSS 订阅 Routes ====================
 
+# 默认推荐订阅源列表
+DEFAULT_RSS_FEEDS = [
+    # ========== 新闻媒体 ==========
+    {
+        "name": "中国新闻网-热点新闻",
+        "feed_url": "http://rsshub:1200/chinanews/scroll-news",
+        "source_type": "chinanews",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "澎湃新闻-头条",
+        "feed_url": "http://rsshub:1200/thepaper/featured",
+        "source_type": "thepaper",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "第一财经-头条",
+        "feed_url": "http://rsshub:1200/yicai/brief",
+        "source_type": "yicai",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "财新网-宏观",
+        "feed_url": "http://rsshub:1200/caixin/finance",
+        "source_type": "caixin",
+        "fetch_interval": 900,
+    },
+    {
+        "name": "凤凰网-资讯",
+        "feed_url": "http://rsshub:1200/ifeng/news",
+        "source_type": "ifeng",
+        "fetch_interval": 600,
+    },
+    # ========== 社交媒体 ==========
+    {
+        "name": "微博热搜榜",
+        "feed_url": "http://rsshub:1200/weibo/search/hot",
+        "source_type": "weibo",
+        "fetch_interval": 300,
+    },
+    {
+        "name": "知乎热榜",
+        "feed_url": "http://rsshub:1200/zhihu/hotlist",
+        "source_type": "zhihu",
+        "fetch_interval": 300,
+    },
+    {
+        "name": "B站热门视频",
+        "feed_url": "http://rsshub:1200/bilibili/ranking/0/3/1",
+        "source_type": "bilibili",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "豆瓣-本周热门电影",
+        "feed_url": "http://rsshub:1200/douban/movie/weekly",
+        "source_type": "douban",
+        "fetch_interval": 3600,
+    },
+    {
+        "name": "抖音热点",
+        "feed_url": "http://rsshub:1200/douyin/trending",
+        "source_type": "douyin",
+        "fetch_interval": 300,
+    },
+    # ========== 科技财经 ==========
+    {
+        "name": "36氪-快讯",
+        "feed_url": "http://rsshub:1200/36kr/newsflashes",
+        "source_type": "36kr",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "虎嗅-24小时",
+        "feed_url": "http://rsshub:1200/huxiu/article",
+        "source_type": "huxiu",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "钛媒体-推荐",
+        "feed_url": "http://rsshub:1200/tmtpost/recommend",
+        "source_type": "tmtpost",
+        "fetch_interval": 900,
+    },
+    {
+        "name": "少数派-最新",
+        "feed_url": "http://rsshub:1200/sspai/index",
+        "source_type": "sspai",
+        "fetch_interval": 1800,
+    },
+    {
+        "name": "爱范儿-首页",
+        "feed_url": "http://rsshub:1200/ifanr/index",
+        "source_type": "ifanr",
+        "fetch_interval": 1800,
+    },
+    # ========== 国际科技 ==========
+    {
+        "name": "Hacker News-热门",
+        "feed_url": "http://rsshub:1200/hackernews/best",
+        "source_type": "hackernews",
+        "fetch_interval": 1800,
+    },
+    {
+        "name": "Product Hunt-今日热门",
+        "feed_url": "http://rsshub:1200/producthunt/today",
+        "source_type": "producthunt",
+        "fetch_interval": 3600,
+    },
+    {
+        "name": "TechCrunch-中文",
+        "feed_url": "http://rsshub:1200/techcrunch/cn",
+        "source_type": "techcrunch",
+        "fetch_interval": 1800,
+    },
+    {
+        "name": "The Verge",
+        "feed_url": "http://rsshub:1200/verge",
+        "source_type": "verge",
+        "fetch_interval": 1800,
+    },
+    # ========== 开发者 ==========
+    {
+        "name": "GitHub-Trending",
+        "feed_url": "http://rsshub:1200/github/trending/daily",
+        "source_type": "github",
+        "fetch_interval": 3600,
+    },
+    {
+        "name": "V2EX-最新",
+        "feed_url": "http://rsshub:1200/v2ex/topics/latest",
+        "source_type": "v2ex",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "掘金-前端",
+        "feed_url": "http://rsshub:1200/juejin/category/frontend",
+        "source_type": "juejin",
+        "fetch_interval": 1800,
+    },
+    {
+        "name": "掘金-后端",
+        "feed_url": "http://rsshub:1200/juejin/category/backend",
+        "source_type": "juejin",
+        "fetch_interval": 1800,
+    },
+    {
+        "name": "InfoQ-推荐",
+        "feed_url": "http://rsshub:1200/infoq/recommend",
+        "source_type": "infoq",
+        "fetch_interval": 3600,
+    },
+    # ========== 设计创意 ==========
+    {
+        "name": "Dribbble-热门",
+        "feed_url": "http://rsshub:1200/dribbble/popular",
+        "source_type": "dribbble",
+        "fetch_interval": 3600,
+    },
+    {
+        "name": "Behance-推荐",
+        "feed_url": "http://rsshub:1200/behance/recommended",
+        "source_type": "behance",
+        "fetch_interval": 3600,
+    },
+    # ========== 学术研究 ==========
+    {
+        "name": "arXiv-计算机科学",
+        "feed_url": "http://rsshub:1200/arxiv/cs",
+        "source_type": "arxiv",
+        "fetch_interval": 7200,
+    },
+    {
+        "name": "arXiv-人工智能",
+        "feed_url": "http://rsshub:1200/arxiv/ai",
+        "source_type": "arxiv",
+        "fetch_interval": 7200,
+    },
+]
+
+
+class InitFeedsResponse(BaseModel):
+    """初始化订阅响应"""
+    added_count: int
+    skipped_count: int
+    added_feeds: List[str]
+    message: str
+
+
+@router.post("/init-default", response_model=InitFeedsResponse)
+async def init_default_feeds(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """初始化默认 RSS 订阅源
+
+    一键添加推荐的 RSS 订阅源，包括：
+    - 新闻媒体：中国新闻网、第一财经
+    - 社交媒体：微博热搜、知乎热榜、B站热门
+    - 科技财经：36氪、Hacker News、Product Hunt
+    - 开发者：GitHub Trending
+    """
+    added_feeds = []
+    skipped_feeds = []
+
+    for feed_data in DEFAULT_RSS_FEEDS:
+        # 检查是否已存在
+        existing = db.query(RSSFeed).filter(
+            RSSFeed.feed_url == feed_data["feed_url"]
+        ).first()
+
+        if existing:
+            skipped_feeds.append(feed_data["name"])
+            continue
+
+        # 创建新订阅
+        feed = RSSFeed(
+            id=str(uuid.uuid4()),
+            name=feed_data["name"],
+            feed_url=feed_data["feed_url"],
+            source_type=feed_data["source_type"],
+            fetch_interval=feed_data["fetch_interval"],
+            is_active=True,
+        )
+        db.add(feed)
+        added_feeds.append(feed_data["name"])
+
+    db.commit()
+
+    return InitFeedsResponse(
+        added_count=len(added_feeds),
+        skipped_count=len(skipped_feeds),
+        added_feeds=added_feeds,
+        message=f"成功添加 {len(added_feeds)} 个订阅，跳过 {len(skipped_feeds)} 个已存在的订阅"
+    )
+
 @router.post("/", response_model=RSSFeedResponse)
 async def create_feed(
     data: RSSFeedCreate,

@@ -8,6 +8,7 @@ export interface CollectTriggerResponse {
 
 export interface CollectStatusResponse {
   task_id: string
+  keyword_id?: string
   keyword: string
   status: 'pending' | 'running' | 'completed' | 'failed'
   collected_count: number

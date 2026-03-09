@@ -146,11 +146,13 @@ async def startup_event():
     import os
     # 测试环境禁用调度器
     if os.environ.get("DISABLE_SCHEDULER") != "true":
-        from .schedulers import start_scheduler, start_rss_scheduler, start_sentiment_worker
+        from .schedulers import start_scheduler, start_rss_scheduler, start_sentiment_worker, start_keyword_scheduler
         # 启动调度器
         start_scheduler()
         # 启动 RSS 调度器
         start_rss_scheduler()
+        # 启动监控主体调度器
+        start_keyword_scheduler()
         # 启动情感分析 Worker
         start_sentiment_worker()
 

@@ -3,3 +3,4 @@
 from .monitor_scheduler import start_scheduler
 from .rss_scheduler import start_rss_scheduler
 from .sentiment_worker import start_sentiment_worker
+from .keyword_scheduler import start_keyword_scheduler

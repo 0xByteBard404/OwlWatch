@@ -3,6 +3,7 @@
 from ..utils.timezone import now_cst
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime as SQLDateTime, Integer, Text
+from sqlalchemy.orm import relationship
 from ..database import Base
 
 
@@ -39,6 +40,13 @@ class RSSFeed(Base):
     # 时间戳
     created_at = Column(SQLDateTime, default=now_cst)
     updated_at = Column(SQLDateTime, default=now_cst, onupdate=now_cst)
+
+    # 关系
+    keyword_associations = relationship(
+        "KeywordRSSAssociation",
+        back_populates="rss_feed",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<RSSFeed {self.name} ({self.feed_url})>"

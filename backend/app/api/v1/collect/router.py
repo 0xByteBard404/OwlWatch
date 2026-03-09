@@ -153,14 +153,17 @@ async def run_collect_task(
                     )
 
                     # 过滤：标题或内容包含关键词，且在时间范围内
+                    keyword_lower = keyword_text.lower()
                     for item in feed_results:
                         # 时间过滤
                         if item.publish_time and item.publish_time < cutoff_time:
                             continue
 
-                        # 关键词过滤
-                        title_match = keyword_text in (item.title or "")
-                        content_match = keyword_text in (item.content or "")
+                        # 关键词过滤（不区分大小写）
+                        title_lower = (item.title or "").lower()
+                        content_lower = (item.content or "").lower()
+                        title_match = keyword_lower in title_lower
+                        content_match = keyword_lower in content_lower
 
                         # 负面模式：额外匹配负面关键词
                         if negative_mode and not (title_match or content_match):
@@ -171,7 +174,7 @@ async def run_collect_task(
                             if not negative_keywords:
                                 negative_keywords = ["违规", "违法", "投诉", "通报", "处罚", "曝光", "被查", "立案", "调查", "维权"]
                             for neg_word in negative_keywords:
-                                if neg_word in (item.title or "") or neg_word in (item.content or ""):
+                                if neg_word.lower() in title_lower or neg_word.lower() in content_lower:
                                     title_match = True
                                     break
 
@@ -181,7 +184,7 @@ async def run_collect_task(
                                 item.source_type = "rss"
                                 results.append(item)
 
-                    logger.info(f"[Task {task_id}][RSS:{feed.name}] Got {len(feed_results)} items, matched {len([i for i in feed_results if keyword_text in (i.title or '') or keyword_text in (i.content or '')])}")
+                    logger.info(f"[Task {task_id}][RSS:{feed.name}] Got {len(feed_results)} items, matched {len([i for i in feed_results if keyword_lower in (i.title or '').lower() or keyword_lower in (i.content or '').lower()])}")
 
                 except Exception as e:
                     logger.error(f"[Task {task_id}][RSS:{feed_id}] Error: {e}")
@@ -274,14 +277,19 @@ async def run_collect_task(
 
         logger.info(f"[Task {task_id}] Processing {len(results)} results...")
 
+        # 预计算小写关键词
+        keyword_lower = keyword_text.lower()
+
         for idx, item in enumerate(results):
             # 更新进度
             if idx % 5 == 0:
                 await task_store.update(task_id, {"message": f"处理中: {idx+1}/{len(results)}"})
 
-            # 严格过滤：标题或摘要必须精确包含关键词
-            title_match = keyword_text in (item.title or "")
-            snippet_match = keyword_text in (item.content or "")
+            # 严格过滤：标题或摘要必须精确包含关键词（不区分大小写）
+            title_lower = (item.title or "").lower()
+            content_lower = (item.content or "").lower()
+            title_match = keyword_lower in title_lower
+            snippet_match = keyword_lower in content_lower
 
             # 如果标题和摘要都不匹配，尝试获取页面实际内容（限制数量）
             if not title_match and not snippet_match and deep_fetch_count < max_deep_fetch:
@@ -452,6 +460,8 @@ async def run_collect_task(
         })
     finally:
         db.close()
+        # 释放监控主体的任务锁
+        await task_store.release_lock(keyword_id)
         # 关闭本任务创建的所有浏览器采集器
         for platform, collector in task_collectors.items():
             if platform in ["baidu", "bing"] and hasattr(collector, 'close'):

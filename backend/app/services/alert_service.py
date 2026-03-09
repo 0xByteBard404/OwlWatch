@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from ..models.alert import Alert
 from ..models.article import Article
-from ..models.keyword import Keyword
+from ..models.keyword import Keyword, DEFAULT_ALERT_CONFIG
+from ..models.article_keyword import ArticleKeyword
 from ..models.sentiment_keyword import SentimentKeyword
 from ..config import settings
 from ..analyzers.sentiment import SentimentAnalyzer
@@ -78,13 +79,13 @@ class AlertService:
 
     def __init__(self, db: Session):
         self.db = db
-        # 从配置读取阈值
+        # 从配置读取阈值（作为默认值）
         self.negative_threshold = settings.alert_negative_threshold
         self.volume_threshold = settings.alert_volume_threshold
-        self.sentiment_analyzer = SentimentAnalyzer()  # 使用新的 HanLP + Cemotion 分析器
+        self.sentiment_analyzer = SentimentAnalyzer()
         self.http_client = httpx.AsyncClient(timeout=30.0)
 
-        # 构建预警规则（使用配置的阈值）
+        # 构建预警规则（使用配置的阈值作为默认）
         self.rules = {
             "negative_burst": AlertRule(
                 rule_type="negative_burst",
@@ -103,30 +104,71 @@ class AlertService:
             ),
         }
 
-    async def check_and_alert(self, keyword_id: str):
-        """检查关键词并触发预警"""
-        # 获取最近 1 小时的文章
-        one_hour_ago = now_cst() - timedelta(hours=1)
-        articles = self.db.query(Article).filter(
-            Article.keyword_id == keyword_id,
-            Article.collect_time >= one_hour_ago
-        ).all()
+    async def check_and_alert(self, keyword_id: str, hours: int = 24):
+        """检查关键词并触发预警
 
-        if not articles:
-            return
-
+        Args:
+            keyword_id: 关键词ID
+            hours: 检查最近多少小时的文章，默认24小时
+        """
+        # 获取监控主体及其预警配置
         keyword = self.db.query(Keyword).filter(Keyword.id == keyword_id).first()
         if not keyword:
+            logger.warning(f"Keyword {keyword_id} not found")
             return
 
-        # 检查负面情感爆发
-        await self._check_negative_burst(articles, keyword)
+        # 使用监控主体的预警配置，如果没有则使用默认配置
+        alert_config = keyword.alert_config or DEFAULT_ALERT_CONFIG
+        logger.info(f"检查预警: keyword={keyword.keyword}, hours={hours}, config={alert_config}")
 
-        # 检查敏感词命中
-        await self._check_sensitive_keywords(articles, keyword)
+        # 通过 ArticleKeyword 关联表获取与该关键词关联的文章
+        time_ago = now_cst() - timedelta(hours=hours)
 
-        # 检查讨论量激增
-        await self._check_volume_spike(articles, keyword)
+        # 查询文章ID列表
+        article_links = self.db.query(ArticleKeyword).filter(
+            ArticleKeyword.keyword_id == keyword_id,
+            ArticleKeyword.matched_at >= time_ago
+        ).all()
+
+        article_ids = [ak.article_id for ak in article_links]
+
+        if not article_ids:
+            logger.info(f"Keyword {keyword.keyword} 没有最近{hours}小时的文章")
+            return
+
+        # 获取文章详情
+        articles = self.db.query(Article).filter(
+            Article.id.in_(article_ids)
+        ).all()
+
+        logger.info(f"Keyword {keyword.keyword} 最近{hours}小时有 {len(articles)} 篇文章")
+
+        # 统计情感分布
+        negative_count = sum(1 for a in articles if a.sentiment_label == 'negative')
+        positive_count = sum(1 for a in articles if a.sentiment_label == 'positive')
+        neutral_count = sum(1 for a in articles if a.sentiment_label == 'neutral')
+        logger.info(f"情感分布: 负面={negative_count}, 正面={positive_count}, 中性={neutral_count}")
+
+        # 检查负面情感爆发（如果启用）
+        nb_config = alert_config.get('negative_burst', {})
+        if nb_config.get('enabled', True):
+            await self._check_negative_burst(articles, keyword, alert_config)
+        else:
+            logger.debug(f"负面爆发预警已禁用")
+
+        # 检查敏感词命中（如果启用）
+        sk_config = alert_config.get('sensitive_keyword', {})
+        if sk_config.get('enabled', True):
+            await self._check_sensitive_keywords(articles, keyword, alert_config)
+        else:
+            logger.debug(f"敏感词预警已禁用")
+
+        # 检查讨论量激增（如果启用）
+        vs_config = alert_config.get('volume_spike', {})
+        if vs_config.get('enabled', True):
+            await self._check_volume_spike(articles, keyword, alert_config, hours=hours)
+        else:
+            logger.debug(f"讨论量激增预警已禁用")
 
     async def _check_cooldown(self, keyword_id: str, alert_type: str) -> bool:
         """检查预警冷却期（同类型预警 1 小时内不重复发送）"""
@@ -139,10 +181,32 @@ class AlertService:
         ).first()
         return existing is not None
 
-    async def _check_negative_burst(self, articles: List[Article], keyword: Keyword):
+    def _get_active_negative_keywords(self, alert_config: dict = None) -> List[str]:
+        """获取活跃的负面敏感词列表"""
+        # 优先使用自定义敏感词
+        custom_keywords = alert_config.get('sensitive_keyword', {}).get('custom_keywords', [])
+        if custom_keywords:
+            return custom_keywords
+
+        # 如果启用了全局敏感词库
+        use_global = alert_config.get('sensitive_keyword', {}).get('use_global', True)
+        if use_global:
+            # 使用全局敏感词库
+            _, negative_keywords = self._get_sentiment_keywords()
+            if negative_keywords:
+                return negative_keywords
+
+        # 使用备用关键词
+        return self._get_fallback_negative_keywords()
+
+    async def _check_negative_burst(self, articles: List[Article], keyword: Keyword, alert_config: dict):
         """检查负面情感爆发"""
         alert_type = "negative_burst"
-        rule = self.rules[alert_type]
+
+        # 从监控主体配置获取阈值
+        nb_config = alert_config.get('negative_burst', {})
+        threshold = nb_config.get('threshold', self.negative_threshold)
+        min_count = nb_config.get('min_count', 3)
 
         # 检查冷却期
         if await self._check_cooldown(keyword.id, alert_type):
@@ -150,21 +214,29 @@ class AlertService:
             return
 
         negative_count = sum(1 for a in articles if a.sentiment_score and a.sentiment_score < -0.3)
-        ratio = negative_count / len(articles) if articles else 0
 
-        if ratio >= rule.threshold:
+        # 检查是否满足最少文章数
+        if len(articles) < min_count:
+            logger.debug(f"文章数 {len(articles)} 少于最小阈值 {min_count}，跳过负面爆发预警")
+            return
+
+        ratio = negative_count / len(articles) if articles else 0
+        logger.info(f"负面情感统计: 负面={negative_count}, 总数={len(articles)}, 比例={ratio:.2%}, 阈值={threshold:.2%}")
+
+        if ratio >= threshold:
             await self._create_alert(
                 keyword=keyword,
                 alert_type=alert_type,
                 alert_level="warning",
-                message=f"1小时内负面情感占比 {ratio:.1%}，超过阈值 {rule.threshold:.1%}",
+                message=f"1小时内负面情感占比 {ratio:.1%}，超过阈值 {threshold:.1%}",
                 articles=[a.id for a in articles if a.sentiment_score and a.sentiment_score < -0.3][:5]
             )
+        else:
+            logger.debug(f"负面比例 {ratio:.2%} 未超过阈值 {threshold:.2%}")
 
-    async def _check_sensitive_keywords(self, articles: List[Article], keyword: Keyword):
+    async def _check_sensitive_keywords(self, articles: List[Article], keyword: Keyword, alert_config: dict):
         """检查敏感词命中"""
         alert_type = "sensitive_keyword"
-        rule = self.rules[alert_type]
 
         # 检查最近已创建的敏感词预警，避免重复
         one_hour_ago = now_cst() - timedelta(hours=1)
@@ -185,11 +257,16 @@ class AlertService:
                     word = match.group(1)
                     alerted_combinations.add((alert.article_id, word))
 
+        # 获取敏感词列表
+        sensitive_words = self._get_active_negative_keywords(alert_config)
+        logger.info(f"检查敏感词，敏感词列表: {sensitive_words[:10]}...")
+
+        alert_count = 0
         for article in articles:
             content = article.content or ""
             title = article.title or ""
 
-            for word in self._get_active_negative_keywords():
+            for word in sensitive_words:
                 if word in content or word in title:
                     # 检查是否已经预警过（同一文章+同一敏感词）
                     combination = (article.id, word)
@@ -204,35 +281,44 @@ class AlertService:
                         message=f"检测到敏感词「{word}」",
                         articles=[article.id]
                     )
+                    alert_count += 1
                     # 记录已预警的组合
                     alerted_combinations.add(combination)
-                    break
+                    break  # 每篇文章最多触发一次敏感词预警
 
-    async def _check_volume_spike(self, articles: List[Article], keyword: Keyword):
+        logger.info(f"敏感词预警创建: {alert_count} 条")
+
+    async def _check_volume_spike(self, articles: List[Article], keyword: Keyword, alert_config: dict, hours: int = 24):
         """检查讨论量激增"""
         alert_type = "volume_spike"
-        rule = self.rules[alert_type]
+
+        # 从监控主体配置获取阈值
+        vs_config = alert_config.get('volume_spike', {})
+        threshold = vs_config.get('threshold', self.volume_threshold)
 
         # 检查冷却期
         if await self._check_cooldown(keyword.id, alert_type):
             logger.debug(f"Alert cooldown: {alert_type} for keyword {keyword.id}")
             return
 
-        # 获取前 1 小时的文章数作为基准
-        two_hours_ago = now_cst() - timedelta(hours=2)
-        one_hour_ago = now_cst() - timedelta(hours=1)
+        # 获取前一个时间段的文章数作为基准
+        current_start = now_cst() - timedelta(hours=hours)
+        previous_start = now_cst() - timedelta(hours=hours * 2)
 
-        previous_count = self.db.query(Article).filter(
-            Article.keyword_id == keyword.id,
-            Article.collect_time >= two_hours_ago,
-            Article.collect_time < one_hour_ago
-        ).count()
+        previous_links = self.db.query(ArticleKeyword).filter(
+            ArticleKeyword.keyword_id == keyword.id,
+            ArticleKeyword.matched_at >= previous_start,
+            ArticleKeyword.matched_at < current_start
+        ).all()
 
+        previous_count = len(previous_links)
         current_count = len(articles)
+
+        logger.info(f"讨论量统计: 当前时段={current_count}, 前一时段={previous_count}")
 
         if previous_count > 0:
             growth = current_count / previous_count
-            if growth >= rule.threshold:
+            if growth >= threshold:
                 await self._create_alert(
                     keyword=keyword,
                     alert_type=alert_type,
@@ -240,6 +326,10 @@ class AlertService:
                     message=f"讨论量增长 {growth:.1f} 倍，当前 {current_count} 条",
                     articles=[a.id for a in articles[:10]]
                 )
+            else:
+                logger.debug(f"讨论量增长 {growth:.1f} 未超过阈值 {threshold}")
+        else:
+            logger.debug(f"前一时段没有文章，无法比较讨论量")
 
     async def _create_alert(
         self,
@@ -255,6 +345,7 @@ class AlertService:
             tenant_id=keyword.tenant_id,
             keyword_id=keyword.id,
             article_id=articles[0] if articles else None,
+            related_article_ids=json.dumps(articles) if articles else None,
             alert_type=alert_type,
             alert_level=alert_level,
             status="pending",
@@ -265,23 +356,24 @@ class AlertService:
         self.db.commit()
         self.db.refresh(alert)
 
-        logger.info(f"Alert created: [{alert_level}] {message}")
+        logger.info(f"Alert created: [{alert_level}] {message}, articles={len(articles)}")
 
-        # 发送通知
-        rule = self.rules.get(alert_type)
-        if rule:
-            for action in rule.actions:
-                try:
-                    if action == "email":
-                        await self._send_email(alert)
-                    elif action == "webhook":
-                        await self._send_webhook(alert)
-                    elif action == "sms":
-                        await self._send_sms(alert)
-                    elif action == "wechat":
-                        await self._send_wechat(alert)
-                except Exception as e:
-                    logger.error(f"Failed to send {action} notification: {e}")
+        # 发送通知 - 使用监控主体的通知配置
+        alert_config = keyword.alert_config or DEFAULT_ALERT_CONFIG
+        notifications = alert_config.get('notifications', ['email', 'webhook'])
+
+        for action in notifications:
+            try:
+                if action == "email":
+                    await self._send_email(alert)
+                elif action == "webhook":
+                    await self._send_webhook(alert)
+                elif action == "sms":
+                    await self._send_sms(alert)
+                elif action == "wechat":
+                    await self._send_wechat(alert)
+            except Exception as e:
+                logger.error(f"Failed to send {action} notification: {e}")
 
     async def _send_email(self, alert: Alert):
         """发送邮件通知"""
@@ -328,6 +420,7 @@ class AlertService:
         """发送 Webhook 通知"""
         webhook_url = settings.alert_webhook_url
         if not webhook_url:
+            logger.debug("Webhook URL not configured, skipping webhook notification")
             return
 
         try:
@@ -359,6 +452,7 @@ class AlertService:
         """发送企业微信通知"""
         wechat_webhook = settings.wechat_webhook_url
         if not wechat_webhook:
+            logger.debug("WeChat webhook not configured, skipping wechat notification")
             return
 
         try:

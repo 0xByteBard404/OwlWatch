@@ -4,13 +4,37 @@ import { request } from './request'
 export interface Alert {
   id: string
   keyword_id: string
+  keyword_name?: string | null
   article_id: string | null
+  related_article_ids: string[]
   alert_type: string | null
   alert_level: string
   status: string
   message: string | null
+  // 处理信息
+  handler_id: string | null
+  handler_name: string | null
+  handle_note: string | null
+  is_false_positive: boolean
+  // 时间
   created_at: string
   handled_at: string | null
+}
+
+export interface ArticleBrief {
+  id: string
+  title: string
+  url: string
+  source: string | null
+  sentiment_score: number | null
+  sentiment_label: string | null
+  publish_time: string | null
+}
+
+export interface AlertDetail extends Alert {
+  keyword_name: string | null
+  related_article_ids: string[]
+  related_articles: ArticleBrief[]
 }
 
 export interface AlertListResponse {
@@ -23,6 +47,7 @@ export interface AlertStatsResponse {
   pending: number
   handled: number
   ignored: number
+  false_positive: number
   by_level: Record<string, number>
   by_type: Record<string, number>
 }
@@ -36,6 +61,14 @@ export interface AlertListParams {
   keyword_id?: string
 }
 
+export interface HandleParams {
+  note?: string
+}
+
+export interface FalsePositiveParams {
+  reason?: string
+}
+
 // API
 export const alertsApi = {
   list: (params: AlertListParams) =>
@@ -43,13 +76,18 @@ export const alertsApi = {
 
   stats: () => request.get<AlertStatsResponse>('/alerts/stats'),
 
-  handle: (id: string) => request.put(`/alerts/${id}/handle`),
+  detail: (id: string) =>
+    request.get<AlertDetail>(`/alerts/${id}`),
 
-  ignore: (id: string) => request.put(`/alerts/${id}/ignore`),
+  handle: (id: string, params?: HandleParams) =>
+    request.put(`/alerts/${id}/handle`, params || {}),
 
-  batchHandle: (ids: string[]) =>
-    request.post('/alerts/batch-handle', { alert_ids: ids }),
+  ignore: (id: string) =>
+    request.put(`/alerts/${id}/ignore`),
 
-  test: (keywordId: string, alertLevel = 'warning', alertType = 'negative_burst') =>
-    request.post(`/alerts/test?keyword_id=${keywordId}&alert_level=${alertLevel}&alert_type=${alertType}`),
+  markFalsePositive: (id: string, params?: FalsePositiveParams) =>
+    request.put(`/alerts/${id}/false-positive`, params || {}),
+
+  batchHandle: (ids: string[], note?: string) =>
+    request.post('/alerts/batch-handle', { alert_ids: ids, note }),
 }

@@ -441,6 +441,38 @@ const handleTestConfig = async (config: RSSHubConfig) => {
   }
 }
 
+// 初始化默认订阅
+const initLoading = ref(false)
+const handleInitDefault = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将添加推荐的热门订阅源，包括：\n\n' +
+      '📰 新闻媒体：中国新闻网、第一财经\n' +
+      '🔥 社交媒体：微博热搜、知乎热榜、B站热门\n' +
+      '💼 科技财经：36氪、Hacker News、Product Hunt\n' +
+      '🐙 开发者：GitHub Trending\n\n' +
+      '已存在的订阅将被跳过。确定继续吗？',
+      '初始化订阅',
+      {
+        type: 'info',
+        confirmButtonText: '确定添加',
+        cancelButtonText: '取消',
+      }
+    )
+
+    initLoading.value = true
+    const result = await rssApi.initDefault()
+    ElMessage.success(result.message)
+    fetchData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+    ElMessage.error(error?.response?.data?.detail || '初始化失败')
+  }
+  } finally {
+    initLoading.value = false
+  }
+}
+
 // 检查平台是否已配置
 const isPlatformConfigured = (platform: string) => {
   return configs.value.some(c => c.platform === platform && c.is_active)
@@ -464,6 +496,10 @@ onMounted(() => {
         <span class="subtitle">RSS SUBSCRIPTIONS</span>
       </div>
       <div class="header-actions">
+        <button class="btn-init" @click="handleInitDefault" :loading="initLoading">
+          <el-icon><Promotion /></el-icon>
+          <span>初始化订阅</span>
+        </button>
         <button class="btn-config" @click="openConfigDialog">
           <el-icon><Setting /></el-icon>
           <span>平台配置</span>
@@ -1147,6 +1183,55 @@ onMounted(() => {
 .btn-config:hover {
   background: rgba(0, 255, 136, 0.1);
   box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+}
+
+/* Init Button - 醒目的渐变按钮 */
+.btn-init {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-init::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.btn-init:hover::before {
+  left: 100%;
+}
+
+.btn-init:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(236, 72, 153, 0.2);
+}
+
+.btn-init:active {
+  transform: translateY(0);
 }
 
 /* Config Dialog */

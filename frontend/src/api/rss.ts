@@ -91,6 +91,13 @@ export interface RSSHubConfigTemplate {
   env_key: string
 }
 
+export interface InitFeedsResponse {
+  added_count: number
+  skipped_count: number
+  added_feeds: string[]
+  message: string
+}
+
 // API
 export const rssApi = {
   // 订阅管理
@@ -105,6 +112,10 @@ export const rssApi = {
     request.put<RSSFeed>(`/rss/${id}`, data),
 
   delete: (id: string) => request.delete(`/rss/${id}`),
+
+  // 初始化默认订阅
+  initDefault: () =>
+    request.post<InitFeedsResponse>('/rss/init-default'),
 
   // 测试和手动获取
   test: (id: string) =>
