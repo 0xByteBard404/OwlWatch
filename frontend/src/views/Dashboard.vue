@@ -325,53 +325,55 @@ const sourceOption = computed(() => ({
   ],
 }))
 
-// 词云配置 - 使用简单的柱状图代替
-const wordBarOption = computed(() => ({
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: 'rgba(15, 21, 32, 0.95)',
-    borderColor: 'rgba(0, 240, 255, 0.3)',
-    textStyle: { color: '#e4e8f1' },
-    axisPointer: { type: 'shadow' },
-  },
-  grid: {
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
-    top: '3%',
-    containLabel: true,
-  },
-  xAxis: {
-    type: 'value',
-    splitLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.1)' } },
-    axisLabel: { color: '#8b95a8' },
-  },
-  yAxis: {
-    type: 'category',
-    data: wordData.value.slice(0, 10).map((w) => w.word),
-    axisLine: { lineStyle: { color: 'rgba(0, 240, 255, 0.2)' } },
-    axisLabel: { color: '#8b95a8' },
-  },
-  series: [
-    {
-      type: 'bar',
-      data: wordData.value.slice(0, 10).map((w) => w.count),
-      itemStyle: {
-        color: {
-          type: 'linear',
-          x: 0, y: 0, x2: 1, y2: 0,
-          colorStops: [
-            { offset: 0, color: '#00f0ff' },
-            { offset: 0.5, color: '#a855f7' },
-            { offset: 1, color: '#ff6b2c' },
-          ],
-        },
-        borderRadius: [0, 4, 4, 0],
-      },
-      barWidth: 16,
-    },
-  ],
-}))
+// 词云颜色配置
+const wordColors = [
+  '#00f0ff', // 青色
+  '#a855f7', // 紫色
+  '#ff6b2c', // 橙色
+  '#00ff88', // 绿色
+  '#ffd000', // 黄色
+  '#ff3366', // 红色
+  '#4ecdc4', // 青绿
+  '#f39c12', // 金色
+]
+
+// 热词云悬停状态
+const hoveredWord = ref<number | null>(null)
+
+// 计算最大词频
+const maxWordCount = computed(() => {
+  if (wordData.value.length === 0) return 0
+  return Math.max(...wordData.value.map(w => w.count))
+})
+
+// 计算词云数据
+const wordCloudData = computed(() => {
+  if (wordData.value.length === 0) return []
+
+  const maxCount = Math.max(...wordData.value.map(w => w.count))
+  const minCount = Math.min(...wordData.value.map(w => w.count))
+
+  return wordData.value.slice(0, 30).map((word, index) => {
+    // 根据频率计算字体大小 (14px - 36px)
+    const sizeRange = 22
+    const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
+    const fontSize = 14 + normalizedSize * sizeRange
+
+    return {
+      word: word.word,
+      count: word.count,
+      fontSize: Math.round(fontSize),
+      color: wordColors[index % wordColors.length],
+      // 随机旋转角度 (-15, 0, 15)
+      rotation: [-15, 0, 0, 0, 15][Math.floor(Math.random() * 5)],
+    }
+  })
+})
+
+// 搜索热词
+const searchWord = (word: { word: string }) => {
+  window.open(`/articles?search=${encodeURIComponent(word.word)}`, '_blank')
+}
 
 onMounted(async () => {
   await Promise.all([
@@ -488,20 +490,33 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- 热词云 -->
       <div class="chart-container cyber-card fade-in-up stagger-6">
         <div class="chart-header">
           <div class="chart-title">
             <span class="title-decorator">◈</span>
-            热词排行
+            热词云
           </div>
         </div>
-        <div class="chart-body">
-          <v-chart
-            v-if="wordData.length > 0"
-            class="chart"
-            :option="wordBarOption"
-            autoresize
-          />
+        <div class="chart-body word-cloud-body">
+          <div v-if="wordCloudData.length > 0" class="word-cloud">
+            <span
+              v-for="(word, index) in wordCloudData"
+              :key="index"
+              class="word-item"
+              :class="{ hot: word.count > maxWordCount * 0.5 }"
+              :style="{
+                fontSize: word.fontSize + 'px',
+                color: word.color,
+                textShadow: `0 2px 8px ${word.color}`,
+              }"
+              @click="searchWord(word)"
+              @mouseenter="hoveredWord = index"
+              @mouseleave="hoveredWord = null"
+            >
+              {{ word.word }}
+            </span>
+          </div>
           <div v-else class="empty-state">
             <el-icon :size="48"><Histogram /></el-icon>
             <span>暂无数据</span>
@@ -713,6 +728,48 @@ onMounted(async () => {
 .chart-body {
   padding: 16px;
   height: 320px;
+}
+
+/* 词云样式 */
+.word-cloud-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.word-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  padding: 10px;
+  width: 100%;
+  height: 100%;
+}
+
+.word-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.word-item:hover {
+  transform: scale(1.15);
+  background: rgba(0, 240, 255, 0.1);
+}
+
+.word-item.hot {
+  font-weight: 700;
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .chart {
