@@ -55,6 +55,17 @@ const goBack = () => {
   router.push('/keywords')
 }
 
+// 剥离 HTML 标签，只保留纯文本
+const stripHtml = (html: string | null | undefined): string => {
+  if (!html) return ''
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 const formatTime = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '-'
 
@@ -232,7 +243,7 @@ onMounted(() => {
                 <span class="source-tag">{{ article.source || '未知' }}</span>
                 <span class="time-tag">{{ formatTime(article.publish_time || article.collect_time) }}</span>
               </div>
-              <h3 class="card-title">{{ article.title }}</h3>
+              <h3 class="card-title">{{ stripHtml(article.title) }}</h3>
               <p class="card-content" v-html="sanitizeHtml(article.content, 100, true) || '暂无摘要...'"></p>
               <div class="card-footer">
                 <div class="sentiment-indicator">
@@ -269,7 +280,7 @@ onMounted(() => {
                 <span class="source-tag">{{ article.source || '未知' }}</span>
                 <span class="time-tag">{{ formatTime(article.publish_time || article.collect_time) }}</span>
               </div>
-              <h3 class="card-title">{{ article.title }}</h3>
+              <h3 class="card-title">{{ stripHtml(article.title) }}</h3>
               <p class="card-content" v-html="sanitizeHtml(article.content, 100, true) || '暂无摘要...'"></p>
               <div class="card-footer">
                 <div class="sentiment-indicator">
@@ -306,7 +317,7 @@ onMounted(() => {
                 <span class="source-tag">{{ article.source || '未知' }}</span>
                 <span class="time-tag">{{ formatTime(article.publish_time || article.collect_time) }}</span>
               </div>
-              <h3 class="card-title">{{ article.title }}</h3>
+              <h3 class="card-title">{{ stripHtml(article.title) }}</h3>
               <p class="card-content" v-html="sanitizeHtml(article.content, 100, true) || '暂无摘要...'"></p>
               <div class="card-footer">
                 <div class="sentiment-indicator">

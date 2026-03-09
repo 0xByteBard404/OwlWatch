@@ -187,6 +187,18 @@ const formatTime = (dateStr: string | null | undefined): string => {
   return `${date.getFullYear()}-${month}-${day} ${timeStr}`
 }
 
+// 剥离 HTML 标签，只保留纯文本（用于标题等需要纯文本显示的场景）
+const stripHtml = (html: string | null | undefined): string => {
+  if (!html) return ''
+  // 使用正则表达式移除所有 HTML 标签
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')  // 将 <br> 转换为空格
+    .replace(/<\/p>/gi, ' ')        // 将 </p> 转换为空格
+    .replace(/<[^>]+>/g, '')        // 移除所有其他 HTML 标签
+    .replace(/\s+/g, ' ')           // 合并多个空格
+    .trim()                         // 移除首尾空格
+}
+
 // 清理 HTML 内容 - 移除乱码字符和限制图片
 const sanitizeHtml = (html: string | null | undefined, maxLength?: number, removeImages = false): string => {
   if (!html) return ''
@@ -344,7 +356,7 @@ onMounted(() => {
         </div>
 
         <!-- Article Title -->
-        <h4 class="article-title">{{ article.title }}</h4>
+        <h4 class="article-title">{{ stripHtml(article.title) }}</h4>
 
         <!-- Article Content Preview -->
         <p class="article-excerpt" v-html="sanitizeHtml(article.content, 120, true) || '暂无内容摘要...'"></p>
@@ -411,7 +423,7 @@ onMounted(() => {
         </div>
 
         <!-- Title -->
-        <h3 class="detail-title">{{ currentArticle.title }}</h3>
+        <h3 class="detail-title">{{ stripHtml(currentArticle.title) }}</h3>
 
         <!-- Meta -->
         <div class="detail-meta">

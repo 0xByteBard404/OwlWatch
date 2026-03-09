@@ -250,6 +250,17 @@ const getKeywordName = (keywordId: string) => {
   return keywords.value.find((k) => k.id === keywordId)?.keyword || keywordId
 }
 
+// 剥离 HTML 标签，只保留纯文本
+const stripHtml = (html: string | null | undefined): string => {
+  if (!html) return ''
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // 跳转到文章详情
 const goToArticle = (article: ArticleBrief) => {
   if (article?.url) {
@@ -531,7 +542,7 @@ onMounted(() => {
                 @click="goToArticle(article)"
               >
                 <div class="article-header">
-                  <span class="article-title">{{ article.title }}</span>
+                  <span class="article-title">{{ stripHtml(article.title) }}</span>
                   <span
                     class="article-sentiment"
                     :class="article.sentiment_label"
