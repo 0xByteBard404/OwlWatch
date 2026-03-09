@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from app.dependencies import get_db
 from app.models.article import Article
 from app.models.article_keyword import ArticleKeyword
+from app.models.user import User
+from app.core.security import get_current_active_user
 from app.utils.timezone import now_cst
 
 router = APIRouter()
@@ -52,7 +54,8 @@ async def list_articles(
     source: Optional[str] = Query(default=None, description="Filter by source"),
     start_date: Optional[datetime] = Query(default=None, description="Start date"),
     end_date: Optional[datetime] = Query(default=None, description="End date"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get articles with filters"""
     query = db.query(Article)
@@ -89,7 +92,10 @@ async def list_articles(
 
 
 @router.get("/sources", response_model=List[str])
-async def get_sources(db: Session = Depends(get_db)):
+async def get_sources(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """获取所有来源列表（用于筛选器）"""
     results = db.query(Article.source).filter(
         Article.source.isnot(None)
@@ -100,7 +106,8 @@ async def get_sources(db: Session = Depends(get_db)):
 @router.get("/{article_id}", response_model=ArticleResponse)
 async def get_article(
     article_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get article details"""
     article = db.query(Article).filter(Article.id == article_id).first()
@@ -149,7 +156,10 @@ class StatsResponse(BaseModel):
 
 
 @router.get("/stats/overview", response_model=StatsResponse)
-async def get_stats_overview(db: Session = Depends(get_db)):
+async def get_stats_overview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """获取概览统计"""
     now = now_cst()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -181,7 +191,8 @@ async def get_stats_overview(db: Session = Depends(get_db)):
 async def get_trend(
     days: int = Query(default=7, ge=1, le=30, description="天数"),
     keyword_id: Optional[str] = Query(default=None, description="关键词ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """获取舆情趋势数据"""
     now = now_cst()
@@ -221,7 +232,10 @@ async def get_trend(
 
 
 @router.get("/sources", response_model=List[str])
-async def get_sources(db: Session = Depends(get_db)):
+async def get_sources_list(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """获取所有来源列表（用于筛选器）"""
     results = db.query(Article.source).filter(
         Article.source.isnot(None)
@@ -233,7 +247,8 @@ async def get_sources(db: Session = Depends(get_db)):
 async def get_source_distribution(
     keyword_id: Optional[str] = Query(default=None, description="关键词ID"),
     limit: int = Query(default=10, ge=1, le=20),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """获取来源分布"""
     query = db.query(
@@ -254,7 +269,8 @@ async def get_word_frequency(
     keyword_id: Optional[str] = Query(default=None, description="关键词ID"),
     days: int = Query(default=7, ge=1, le=30, description="天数"),
     limit: int = Query(default=50, ge=10, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """获取高频词统计（用于词云）"""
     now = now_cst()

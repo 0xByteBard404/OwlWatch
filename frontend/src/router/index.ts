@@ -3,6 +3,12 @@ import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login.vue'),
+    meta: { title: '登录', public: true },
+  },
+  {
     path: '/',
     redirect: '/dashboard',
   },
@@ -55,8 +61,27 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+// 路由守卫
+router.beforeEach((to, _from, next) => {
+  // 设置页面标题
   document.title = `${to.meta.title || 'OwlWatch'} - OwlWatch 舆情监控`
+
+  // 检查是否需要认证
+  const isPublic = to.meta.public === true
+  const token = localStorage.getItem('token')
+
+  if (!isPublic && !token) {
+    // 需要认证但没有 token，跳转到登录页
+    next({
+      path: '/login',
+      query: { redirect: to.fullPath },
+    })
+  } else if (to.path === '/login' && token) {
+    // 已登录用户访问登录页，跳转到首页
+    next('/dashboard')
+  } else {
+    next()
+  }
 })
 
 export default router

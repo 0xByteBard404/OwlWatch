@@ -2,6 +2,12 @@
 # OwlWatch 舆情监控系统 - Docker Compose
 # 使用方法: docker compose up -d
 # ============================================
+#
+# 配置说明：
+# - 所有敏感配置在 ./backend/.env 中设置
+# - postgres 服务通过 env_file 读取数据库密码
+# - backend 服务通过 env_file 读取所有配置，仅覆盖 Docker 特定的连接地址
+# ============================================
 
 services:
   # ==================== PostgreSQL 数据库 ====================
@@ -9,17 +15,16 @@ services:
     image: postgres:16-alpine
     container_name: owlwatch-postgres
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-owlwatch}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-owlwatch123}
-      POSTGRES_DB: ${POSTGRES_DB:-owlwatch}
       TZ: Asia/Shanghai
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - owlwatch_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-owlwatch} -d ${POSTGRES_DB:-owlwatch}"]
+      test: ["CMD-SHELL", "pg_isready -U owlwatch -d owlwatch"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,11 +56,8 @@ services:
       NODE_ENV: production
       CACHE_TYPE: redis
       REDIS_URL: redis://redis:6379/1
-      # 浏览器配置（用于动态渲染页面）
       PUPPETEER_WS_ENDPOINT: ""
-      # 请求配置
       REQUEST_TIMEOUT: 30000
-      # 日志级别
       LOG_LEVEL: warn
       TZ: Asia/Shanghai
     networks:
@@ -80,8 +82,8 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # Docker 环境下覆盖数据库连接地址
-      DATABASE_URL: postgresql://${POSTGRES_USER:-owlwatch}:${POSTGRES_PASSWORD:-owlwatch123}@postgres:5432/${POSTGRES_DB:-owlwatch}
+      # Docker 环境下覆盖数据库主机名（使用 postgres 服务名）
+      DATABASE_HOST: postgres
       REDIS_URL: redis://redis:6379/0
       RSSHUB_URL: http://rsshub:1200
       APP_ENV: production

@@ -9,6 +9,8 @@ import uuid
 
 from app.dependencies import get_db
 from app.models.keyword import Keyword
+from app.models.user import User
+from app.core.security import get_current_active_user
 from app.utils.timezone import now_cst
 
 router = APIRouter()
@@ -54,9 +56,10 @@ class KeywordResponse(BaseModel):
 @router.post("/", response_model=KeywordResponse)
 async def create_keyword(
     data: KeywordCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """创建监控关键词"""
+    """创建监控关键词（需要认证）"""
     # 检查是否已存在
     existing = db.query(Keyword).filter(
         Keyword.keyword == data.keyword
@@ -90,9 +93,10 @@ async def list_keywords(
     skip: int = 0,
     limit: int = 100,
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """获取关键词列表"""
+    """获取关键词列表（需要认证）"""
     query = db.query(Keyword)
 
     if is_active is not None:
@@ -105,9 +109,10 @@ async def list_keywords(
 @router.get("/{keyword_id}", response_model=KeywordResponse)
 async def get_keyword(
     keyword_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """获取单个关键词详情"""
+    """获取单个关键词详情（需要认证）"""
     keyword_obj = db.query(Keyword).filter(Keyword.id == keyword_id).first()
 
     if not keyword_obj:
@@ -120,9 +125,10 @@ async def get_keyword(
 async def update_keyword(
     keyword_id: str,
     data: KeywordUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """更新关键词配置"""
+    """更新关键词配置（需要认证）"""
     keyword_obj = db.query(Keyword).filter(Keyword.id == keyword_id).first()
 
     if not keyword_obj:
@@ -150,9 +156,10 @@ async def update_keyword(
 @router.delete("/{keyword_id}")
 async def delete_keyword(
     keyword_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """删除关键词"""
+    """删除关键词（需要认证）"""
     keyword_obj = db.query(Keyword).filter(Keyword.id == keyword_id).first()
 
     if not keyword_obj:

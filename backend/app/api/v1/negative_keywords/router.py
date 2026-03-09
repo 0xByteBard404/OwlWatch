@@ -9,6 +9,8 @@ from datetime import datetime
 
 from app.dependencies import get_db
 from app.models.negative_keyword import NegativeKeyword
+from app.models.user import User
+from app.core.security import get_current_active_user
 from app.utils.timezone import now_cst
 
 router = APIRouter()
@@ -33,7 +35,8 @@ class NegativeKeywordResponse(BaseModel):
 @router.get("/", response_model=List[NegativeKeywordResponse])
 async def list_negative_keywords(
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """获取负面关键词列表"""
     query = db.query(NegativeKeyword)
@@ -45,7 +48,8 @@ async def list_negative_keywords(
 @router.post("/", response_model=NegativeKeywordResponse)
 async def create_negative_keyword(
     data: NegativeKeywordCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """创建负面关键词"""
     # 检查是否已存在
@@ -70,7 +74,8 @@ async def create_negative_keyword(
 async def update_negative_keyword(
     keyword_id: str,
     data: NegativeKeywordCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """更新负面关键词"""
     keyword = db.query(NegativeKeyword).filter(NegativeKeyword.id == keyword_id).first()
@@ -95,7 +100,8 @@ async def update_negative_keyword(
 @router.put("/{keyword_id}/toggle")
 async def toggle_negative_keyword(
     keyword_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """启用/禁用负面关键词"""
     keyword = db.query(NegativeKeyword).filter(NegativeKeyword.id == keyword_id).first()
@@ -111,7 +117,8 @@ async def toggle_negative_keyword(
 @router.delete("/{keyword_id}")
 async def delete_negative_keyword(
     keyword_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """删除负面关键词"""
     keyword = db.query(NegativeKeyword).filter(NegativeKeyword.id == keyword_id).first()
@@ -124,7 +131,10 @@ async def delete_negative_keyword(
 
 
 @router.post("/init-defaults")
-async def init_default_keywords(db: Session = Depends(get_db)):
+async def init_default_keywords(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """初始化默认负面关键词"""
     defaults = ["违规", "违法", "投诉", "通报", "处罚", "曝光", "被查", "立案", "调查", "维权"]
 

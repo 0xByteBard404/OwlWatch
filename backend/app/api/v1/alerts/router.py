@@ -11,6 +11,8 @@ from datetime import datetime
 
 from app.dependencies import get_db
 from app.models.alert import Alert
+from app.models.user import User
+from app.core.security import get_current_active_user
 from app.services.alert_service import AlertService
 from app.utils.timezone import now_cst
 
@@ -63,7 +65,8 @@ async def list_alerts(
     keyword_id: Optional[str] = Query(default=None, description="Filter by keyword"),
     page: int = Query(default=1, ge=1, description="Page number"),
     size: int = Query(default=20, ge=1, le=100, description="Page size"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get alerts with filters"""
     query = db.query(Alert)
@@ -86,7 +89,8 @@ async def list_alerts(
 @router.get("/stats", response_model=AlertStatsResponse)
 async def get_alert_stats(
     keyword_id: Optional[str] = Query(default=None, description="Filter by keyword"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get alert statistics"""
     base_query = db.query(Alert)
@@ -126,7 +130,8 @@ async def get_alert_stats(
 @router.put("/{alert_id}/handle")
 async def handle_alert(
     alert_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Mark alert as handled"""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
@@ -145,7 +150,8 @@ async def handle_alert(
 @router.put("/{alert_id}/ignore")
 async def ignore_alert(
     alert_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Mark alert as ignored"""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
@@ -164,7 +170,8 @@ async def ignore_alert(
 @router.post("/batch-handle")
 async def batch_handle_alerts(
     request: BatchHandleRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Batch handle alerts"""
     if not request.alert_ids:
@@ -191,7 +198,8 @@ async def test_alert(
     alert_level: str = Query(default="warning", description="预警级别"),
     alert_type: str = Query(default="negative_burst", description="预警类型"),
     background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """手动触发测试预警"""
     # 创建测试预警
@@ -242,7 +250,8 @@ async def test_alert(
 @router.delete("/{alert_id}")
 async def delete_alert(
     alert_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Delete an alert"""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()

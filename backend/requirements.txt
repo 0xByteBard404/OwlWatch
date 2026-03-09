@@ -10,6 +10,14 @@ python-dotenv>=1.0.1
 httpx>=0.27.0,<1.0.0  # HTTP 客户端（固定稳定版本）
 pydash>=7.4.3
 PyJWT>=2.8.0
+
+# 安全依赖
+bcrypt>=4.1.0  # 密码哈希（直接使用，替代 passlib）
+python-jose[cryptography]>=3.3.0  # JWT增强
+email-validator>=2.1.0  # 邮箱验证
+python-multipart>=0.0.9  # Form 表单数据解析（FastAPI OAuth2 登录必需）
+
+# 数据库驱动
 psycopg2-binary>=2.9.9  # PostgreSQL 驱动
 aiomysql>=0.2.0  # 异步 MySQL 驱动（如果需要）
 aiosqlite>=0.20.0  # 异步 SQLite 驱动

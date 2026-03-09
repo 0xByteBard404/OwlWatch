@@ -12,6 +12,8 @@ import os
 from app.dependencies import get_db
 from app.models.rss_feed import RSSFeed
 from app.models.rsshub_config import RSSHubConfig
+from app.models.user import User
+from app.core.security import get_current_active_user
 from app.schedulers.rss_scheduler import fetch_feed
 from app.utils.timezone import now_cst
 
@@ -179,13 +181,18 @@ def mask_config_value(value: str, show_length: int = 8) -> str:
 
 
 @router.get("/configs/templates")
-async def get_config_templates():
+async def get_config_templates(
+    current_user: User = Depends(get_current_active_user)
+):
     """获取需要配置的平台模板列表"""
     return RSSHUB_CONFIG_TEMPLATES
 
 
 @router.get("/configs", response_model=List[RSSHubConfigResponse])
-async def list_configs(db: Session = Depends(get_db)):
+async def list_configs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """获取所有 RSSHub 配置"""
     configs = db.query(RSSHubConfig).all()
     # 脱敏处理
@@ -209,7 +216,8 @@ async def list_configs(db: Session = Depends(get_db)):
 @router.post("/configs", response_model=RSSHubConfigResponse)
 async def create_config(
     data: RSSHubConfigCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """创建或更新 RSSHub 配置"""
     # 检查是否已存在
@@ -257,7 +265,8 @@ async def create_config(
 @router.delete("/configs/{config_id}")
 async def delete_config(
     config_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """删除 RSSHub 配置"""
     config = db.query(RSSHubConfig).filter(RSSHubConfig.id == config_id).first()
@@ -272,7 +281,8 @@ async def delete_config(
 @router.post("/configs/{config_id}/test")
 async def test_config(
     config_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """测试 RSSHub 配置是否有效"""
     config = db.query(RSSHubConfig).filter(RSSHubConfig.id == config_id).first()
@@ -326,7 +336,8 @@ async def test_config(
 @router.post("/", response_model=RSSFeedResponse)
 async def create_feed(
     data: RSSFeedCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """创建 RSS 订阅"""
     # 检查是否已存在相同 URL
@@ -358,7 +369,8 @@ async def list_feeds(
     limit: int = 100,
     is_active: Optional[bool] = None,
     source_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """获取 RSS 订阅列表"""
     query = db.query(RSSFeed)
@@ -376,7 +388,8 @@ async def list_feeds(
 @router.get("/{feed_id}", response_model=RSSFeedResponse)
 async def get_feed(
     feed_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """获取单个 RSS 订阅详情"""
     feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
@@ -391,7 +404,8 @@ async def get_feed(
 async def update_feed(
     feed_id: str,
     data: RSSFeedUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """更新 RSS 订阅配置"""
     feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
@@ -414,7 +428,8 @@ async def update_feed(
 @router.delete("/{feed_id}")
 async def delete_feed(
     feed_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """删除 RSS 订阅"""
     feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
@@ -431,7 +446,8 @@ async def delete_feed(
 @router.post("/{feed_id}/test", response_model=RSSFeedTestResponse)
 async def test_feed(
     feed_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """测试 RSS 订阅是否可用"""
     feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
@@ -467,7 +483,8 @@ async def test_feed(
 async def trigger_fetch(
     feed_id: str,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """手动触发获取 RSS 订阅"""
     feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
@@ -879,7 +896,9 @@ RSSHUB_TEMPLATES = {
 
 
 @router.get("/rsshub/platforms")
-async def get_rsshub_platforms():
+async def get_rsshub_platforms(
+    current_user: User = Depends(get_current_active_user)
+):
     """获取 RSSHub 支持的平台列表"""
     return {
         platform: {
@@ -894,7 +913,8 @@ async def get_rsshub_platforms():
 @router.post("/rsshub/build")
 async def build_rsshub_url(
     data: RSSHubURLBuild,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """构建 RSSHub 订阅 URL"""
     from urllib.parse import quote

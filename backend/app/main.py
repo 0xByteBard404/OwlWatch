@@ -84,6 +84,7 @@ from .api.v1.collect.router import router as collect_router
 from .api.v1.negative_keywords.router import router as negative_keywords_router
 from .api.v1.rss.router import router as rss_router
 from .api.v1.sentiment_keywords.router import router as sentiment_keywords_router
+from .api.v1.stats.router import router as stats_router
 from .models.sentiment_keyword import SentimentKeyword
 
 # 创建数据库表
@@ -95,12 +96,12 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# CORS 配置
+# CORS 配置 - 使用配置文件中的origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -114,6 +115,7 @@ app.include_router(collect_router, prefix="/api/v1/collect")
 app.include_router(negative_keywords_router, prefix="/api/v1/negative-keywords")
 app.include_router(rss_router, prefix="/api/v1/rss")
 app.include_router(sentiment_keywords_router, prefix="/api/v1/sentiment-keywords")
+app.include_router(stats_router, prefix="/api/v1/stats")
 
 
 @app.get("/")
@@ -124,6 +126,18 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/debug/config")
+async def debug_config():
+    """调试端点：检查配置是否正确加载（仅用于排查问题）"""
+    return {
+        "app_env": settings.app_env,
+        "jwt_secret_preview": settings.jwt_secret[:8] + "..." if settings.jwt_secret else "NOT SET",
+        "jwt_algorithm": settings.jwt_algorithm,
+        "database_url_preview": settings.database_url[:30] + "..." if settings.database_url else "NOT SET",
+        "initial_admin_username": settings.initial_admin_username,
+    }
 
 
 @app.on_event("startup")

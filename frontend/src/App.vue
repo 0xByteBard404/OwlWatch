@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
 
 const isCollapse = ref(false)
 const currentTime = ref(new Date().toLocaleString('zh-CN'))
+const username = ref(localStorage.getItem('username') || 'admin')
 
 // Update time every second
 setInterval(() => {
@@ -25,6 +27,36 @@ const menuItems = [
 const handleSelect = (path: string) => {
   router.push(path)
 }
+
+// 登出
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+
+    // 清除 token 和用户信息
+    localStorage.removeItem('token')
+    localStorage.removeItem('username')
+
+    ElMessage.success('已退出登录')
+
+    // 跳转到登录页
+    router.push('/login')
+  } catch {
+    // 用户取消
+  }
+}
+
+// 检查登录状态
+onMounted(() => {
+  const token = localStorage.getItem('token')
+  if (!token && route.path !== '/login') {
+    router.push('/login')
+  }
+})
 </script>
 
 <template>
@@ -106,6 +138,13 @@ const handleSelect = (path: string) => {
           <div class="system-time">
             <span class="time-label">SYSTEM TIME</span>
             <span class="time-value data-value">{{ currentTime }}</span>
+          </div>
+          <div class="user-menu">
+            <el-icon class="user-icon"><User /></el-icon>
+            <span class="user-name">{{ username }}</span>
+            <button class="logout-btn" @click="handleLogout" title="退出登录">
+              <el-icon><SwitchButton /></el-icon>
+            </button>
           </div>
         </div>
       </header>
@@ -498,5 +537,46 @@ const handleSelect = (path: string) => {
 .page-leave-to {
   opacity: 0;
   transform: translateY(-20px);
+}
+
+/* User Menu */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 20px;
+}
+
+.user-icon {
+  color: var(--neon-cyan);
+  font-size: 16px;
+}
+
+.user-name {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  letter-spacing: 0.05em;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  border-radius: 4px;
+}
+
+.logout-btn:hover {
+  color: var(--neon-orange);
+  background: rgba(255, 107, 44, 0.1);
 }
 </style>

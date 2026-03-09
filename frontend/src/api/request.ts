@@ -4,14 +4,14 @@ import { ElMessage } from 'element-plus'
 
 // 创建 axios 实例
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
 })
 
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
-    // 可以在这里添加 token
+    // 添加 token
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -29,6 +29,16 @@ service.interceptors.response.use(
     return response.data
   },
   (error) => {
+    // 401 未授权，跳转到登录页
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      // 避免在登录页重复跳转
+      if (window.location.pathname !== '/login') {
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`
+      }
+      return Promise.reject(error)
+    }
+
     const message = error.response?.data?.detail || error.message || '请求失败'
     ElMessage.error(message)
     return Promise.reject(error)

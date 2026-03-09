@@ -6,5 +6,7 @@ from .alert import Alert
 from .tenant import Tenant
 from .report import Report
 from .rss_feed import RSSFeed
+from .keyword_sentiment_stats import KeywordSentimentStats
+from .user import User
 
-__all__ = ["Keyword", "Article", "ArticleKeyword", "Alert", "Tenant", "Report", "RSSFeed"]
+__all__ = ["Keyword", "Article", "ArticleKeyword", "Alert", "Tenant", "Report", "RSSFeed", "KeywordSentimentStats", "User"]

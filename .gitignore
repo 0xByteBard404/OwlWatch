@@ -56,4 +56,8 @@ logs/
 # Temporary files
 *.tmp
 *.temp
-nul
+
+# AI tools development documents
+.serena/
+docs/development/
+docs/plans/

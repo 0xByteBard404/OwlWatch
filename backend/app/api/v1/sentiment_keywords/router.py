@@ -8,6 +8,8 @@ import logging
 
 from app.dependencies import get_db
 from app.models.sentiment_keyword import SentimentKeyword
+from app.models.user import User
+from app.core.security import get_current_active_user
 from pydantic import BaseModel
 
 router = APIRouter(tags=["sentiment-keywords"])
@@ -47,6 +49,7 @@ async def list_keywords(
     category: Optional[str] = None,
     is_active: Optional[bool] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取情感关键词列表"""
     query = db.query(SentimentKeyword)
@@ -78,6 +81,7 @@ async def list_keywords(
 async def create_keyword(
     data: SentimentKeywordCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """创建情感关键词"""
     # 检查是否已存在
@@ -116,6 +120,7 @@ async def update_keyword(
     keyword_id: str,
     data: SentimentKeywordUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """更新情感关键词"""
     keyword = db.query(SentimentKeyword).filter(
@@ -160,6 +165,7 @@ async def update_keyword(
 async def delete_keyword(
     keyword_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """删除情感关键词"""
     keyword = db.query(SentimentKeyword).filter(
@@ -176,7 +182,10 @@ async def delete_keyword(
 
 
 @router.get("/categories", response_model=List[str])
-async def get_categories(db: Session = Depends(get_db)):
+async def get_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """获取所有分类"""
     from sqlalchemy import func
 
@@ -191,6 +200,7 @@ async def get_categories(db: Session = Depends(get_db)):
 async def toggle_keyword(
     keyword_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """切换情感关键词状态"""
     keyword = db.query(SentimentKeyword).filter(
@@ -207,7 +217,10 @@ async def toggle_keyword(
 
 
 @router.get("/status")
-async def get_keyword_status(db: Session = Depends(get_db)):
+async def get_keyword_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """获取情感关键词状态（是否已初始化）"""
     total_count = db.query(SentimentKeyword).count()
     negative_count = db.query(SentimentKeyword).filter(
@@ -229,6 +242,7 @@ async def get_keyword_status(db: Session = Depends(get_db)):
 async def init_default_keywords(
     force: bool = False,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     初始化默认情感关键词词库
@@ -290,6 +304,9 @@ async def init_default_keywords(
 
 
 @router.post("/reset")
-async def reset_keywords(db: Session = Depends(get_db)):
+async def reset_keywords(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """重置词库到默认状态（清空后重新初始化）"""
     return await init_default_keywords(force=True, db=db)

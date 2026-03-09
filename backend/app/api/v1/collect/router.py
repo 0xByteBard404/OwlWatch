@@ -12,6 +12,8 @@ from typing import List, Optional
 from app.dependencies import get_db
 from app.database import SessionLocal
 from app.models.keyword import Keyword
+from app.models.user import User
+from app.core.security import get_current_active_user
 from app.models.article import Article
 from app.models.article_keyword import ArticleKeyword
 from app.models.negative_keyword import NegativeKeyword
@@ -27,6 +29,7 @@ from app.collectors.base import CollectRequest
 from app.config import settings
 from app.analyzers.sentiment import SentimentAnalyzer
 from app.services.redis_service import get_task_store
+from app.services.sentiment_stats_service import increment_sentiment_stats
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +401,15 @@ async def run_collect_task(
             db.add(article_keyword)
             saved_count += 1
 
+            # 增量更新情感统计
+            increment_sentiment_stats(
+                db=db,
+                keyword_id=keyword_id,
+                sentiment_label=sentiment_label or "neutral",
+                sentiment_score=sentiment_score,
+                match_type=match_type
+            )
+
             # 每10条提交一次，减少锁竞争
             if saved_count % 10 == 0:
                 try:
@@ -456,9 +468,10 @@ async def trigger_collect(
     keyword_id: str = Query(..., description="关键词ID"),
     time_range: str = Query(default="oneDay", description="时间范围"),
     negative_mode: bool = Query(default=False, description="负面舆情模式"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """触发异步采集任务"""
+    """触发异步采集任务（需要认证）"""
     # 查找关键词
     keyword = db.query(Keyword).filter(Keyword.id == keyword_id).first()
     if not keyword:
