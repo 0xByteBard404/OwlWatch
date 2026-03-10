@@ -349,6 +349,31 @@ DEFAULT_RSS_FEEDS = [
         "fetch_interval": 600,
     },
     {
+        "name": "凤凰网-资讯",
+        "feed_url": "http://rsshub:1200/ifeng/news",
+        "source_type": "ifeng",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "观察者网-头条",
+        "feed_url": "http://rsshub:1200/guancha/headline",
+        "source_type": "guancha",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "新浪新闻-滚动",
+        "feed_url": "http://rsshub:1200/sina/rollnews",
+        "source_type": "sina",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "网易新闻-排行榜",
+        "feed_url": "http://rsshub:1200/netease/news/rank",
+        "source_type": "netease",
+        "fetch_interval": 600,
+    },
+    # ========== 财经金融 ==========
+    {
         "name": "第一财经-头条",
         "feed_url": "http://rsshub:1200/yicai/brief",
         "source_type": "yicai",
@@ -361,9 +386,27 @@ DEFAULT_RSS_FEEDS = [
         "fetch_interval": 900,
     },
     {
-        "name": "凤凰网-资讯",
-        "feed_url": "http://rsshub:1200/ifeng/news",
-        "source_type": "ifeng",
+        "name": "华尔街见闻-全球",
+        "feed_url": "http://rsshub:1200/wallstreetcn/news/global",
+        "source_type": "wallstreetcn",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "华尔街见闻-A股",
+        "feed_url": "http://rsshub:1200/wallstreetcn/news/a-shares",
+        "source_type": "wallstreetcn",
+        "fetch_interval": 600,
+    },
+    {
+        "name": "财联社-电报",
+        "feed_url": "http://rsshub:1200/cls/telegraph",
+        "source_type": "cls",
+        "fetch_interval": 300,
+    },
+    {
+        "name": "东方财富-要闻",
+        "feed_url": "http://rsshub:1200/eastmoney/report/important",
+        "source_type": "eastmoney",
         "fetch_interval": 600,
     },
     # ========== 社交媒体 ==========
@@ -377,6 +420,18 @@ DEFAULT_RSS_FEEDS = [
         "name": "知乎热榜",
         "feed_url": "http://rsshub:1200/zhihu/hotlist",
         "source_type": "zhihu",
+        "fetch_interval": 300,
+    },
+    {
+        "name": "今日头条-热榜",
+        "feed_url": "http://rsshub:1200/toutiao/hot",
+        "source_type": "toutiao",
+        "fetch_interval": 300,
+    },
+    {
+        "name": "百度热搜",
+        "feed_url": "http://rsshub:1200/baidu/topwords/realtime",
+        "source_type": "baidu",
         "fetch_interval": 300,
     },
     # ========== 科技财经 ==========
@@ -399,15 +454,15 @@ DEFAULT_RSS_FEEDS = [
         "fetch_interval": 900,
     },
     {
-        "name": "少数派-最新",
-        "feed_url": "http://rsshub:1200/sspai/index",
-        "source_type": "sspai",
-        "fetch_interval": 1800,
+        "name": "IT之家-资讯",
+        "feed_url": "http://rsshub:1200/ithome/ranking/7days",
+        "source_type": "ithome",
+        "fetch_interval": 900,
     },
     {
-        "name": "爱范儿-首页",
-        "feed_url": "http://rsshub:1200/ifanr/index",
-        "source_type": "ifanr",
+        "name": "奇客Solidot",
+        "feed_url": "http://rsshub:1200/solidot/www",
+        "source_type": "solidot",
         "fetch_interval": 1800,
     },
     # ========== 国际科技 ==========
@@ -427,12 +482,6 @@ DEFAULT_RSS_FEEDS = [
         "name": "TechCrunch-中文",
         "feed_url": "http://rsshub:1200/techcrunch/cn",
         "source_type": "techcrunch",
-        "fetch_interval": 1800,
-    },
-    {
-        "name": "The Verge",
-        "feed_url": "http://rsshub:1200/verge",
-        "source_type": "verge",
         "fetch_interval": 1800,
     },
     # ========== 开发者 ==========
