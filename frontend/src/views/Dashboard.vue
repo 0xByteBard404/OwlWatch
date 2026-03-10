@@ -340,13 +340,18 @@ const wordColors = [
 // 热词云暂停状态
 const cloudPaused = ref(false)
 
-// 计算词云数据 - 3D 球形分布（热门词汇在赤道位置）
+// 生成随机种子（基于字符串）的伪随机数
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
+  return x - Math.floor(x)
+}
+
+// 计算词云数据 - 3D 球形分布（热门词汇在赤道位置，随机参差分布）
 const wordCloudData = computed(() => {
   if (wordData.value.length === 0) return []
 
   const maxCount = Math.max(...wordData.value.map(w => w.count))
   const minCount = Math.min(...wordData.value.map(w => w.count))
-  // 增加词汇数量到 50 个
   const total = Math.min(wordData.value.length, 50)
 
   return wordData.value.slice(0, total).map((word, index) => {
@@ -355,29 +360,28 @@ const wordCloudData = computed(() => {
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
     const fontSize = 10 + normalizedSize * sizeRange
 
-    // 3D 球形分布 - 热门词汇集中在赤道位置
-    // 赤道位置 phi = π/2，最醒目
-    // 使用非线性映射：热门词（index 小）靠近赤道，冷门词分布到两极
+    // 使用词汇本身作为随机种子，确保每次渲染位置一致
+    const seed = word.word.charCodeAt(0) * 1000 + index
 
-    // 计算纬度偏移：热门词偏移小，冷门词偏移大
-    // normalizedIndex: 0 (最热) -> 1 (最冷)
-    const normalizedIndex = index / (total - 1 || 1)
+    // 热门程度：0（最热）到 1（最冷）
+    const hotness = index / (total - 1 || 1)
 
-    // 使用指数分布让热门词更集中在赤道
-    // phi 从 π/2（赤道）向 0 或 π（两极）扩展
-    const maxLatitude = Math.PI * 0.4 // 最大纬度范围 ±72度
-    const latitude = maxLatitude * Math.pow(normalizedIndex, 0.7) // 指数分布
+    // 纬度：热门词在赤道附近，冷门词随机分布到两极
+    // hotness 越小（越热门），纬度范围越小
+    const maxLatitude = Math.PI * 0.42 // 最大 ±75度
+    const latitudeRange = maxLatitude * Math.pow(hotness, 0.6)
+    const randomLatitude = (seededRandom(seed) - 0.5) * 2 * latitudeRange
+    const phi = Math.PI / 2 + randomLatitude
 
-    // 交替分配到北半球和南半球（但热门词都在赤道附近）
-    const phi = Math.PI / 2 + (index % 2 === 0 ? latitude : -latitude)
+    // 经度：完全随机分布，参差不齐
+    const theta = seededRandom(seed + 1) * Math.PI * 2
 
-    // 经度均匀分布
-    const theta = (index / total) * Math.PI * 2 * 2 // 绕两圈
-    const radius = 120 // 球体半径
+    // 半径：稍微随机变化，让层次感更强
+    const radius = 115 + seededRandom(seed + 2) * 15
 
     // 计算旋转角度用于球面贴图
-    const rx = (phi - Math.PI / 2) * (180 / Math.PI) // 转换为角度
-    const ry = theta * (180 / Math.PI) // 转换为角度
+    const rx = (phi - Math.PI / 2) * (180 / Math.PI)
+    const ry = theta * (180 / Math.PI)
     const rz = radius
 
     return {
@@ -385,10 +389,9 @@ const wordCloudData = computed(() => {
       count: word.count,
       fontSize: Math.round(fontSize),
       color: wordColors[index % wordColors.length],
-      // 旋转角度和半径
       rx: Math.round(rx),
       ry: Math.round(ry),
-      rz: rz,
+      rz: Math.round(rz),
     }
   })
 })
