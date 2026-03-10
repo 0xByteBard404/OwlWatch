@@ -340,7 +340,7 @@ const wordColors = [
 // 热词云暂停状态
 const cloudPaused = ref(false)
 
-// 计算词云数据 - 3D 球形分布
+// 计算词云数据 - 3D 球形分布（热门词汇在赤道位置）
 const wordCloudData = computed(() => {
   if (wordData.value.length === 0) return []
 
@@ -355,14 +355,27 @@ const wordCloudData = computed(() => {
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
     const fontSize = 10 + normalizedSize * sizeRange
 
-    // 3D 球形分布 - 使用斐波那契球面分布算法
-    const phi = Math.acos(-1 + (2 * index + 1) / total)
-    const theta = Math.sqrt(total * Math.PI) * phi
+    // 3D 球形分布 - 热门词汇集中在赤道位置
+    // 赤道位置 phi = π/2，最醒目
+    // 使用非线性映射：热门词（index 小）靠近赤道，冷门词分布到两极
+
+    // 计算纬度偏移：热门词偏移小，冷门词偏移大
+    // normalizedIndex: 0 (最热) -> 1 (最冷)
+    const normalizedIndex = index / (total - 1 || 1)
+
+    // 使用指数分布让热门词更集中在赤道
+    // phi 从 π/2（赤道）向 0 或 π（两极）扩展
+    const maxLatitude = Math.PI * 0.4 // 最大纬度范围 ±72度
+    const latitude = maxLatitude * Math.pow(normalizedIndex, 0.7) // 指数分布
+
+    // 交替分配到北半球和南半球（但热门词都在赤道附近）
+    const phi = Math.PI / 2 + (index % 2 === 0 ? latitude : -latitude)
+
+    // 经度均匀分布
+    const theta = (index / total) * Math.PI * 2 * 2 // 绕两圈
     const radius = 120 // 球体半径
 
     // 计算旋转角度用于球面贴图
-    // rx: 绕 X 轴旋转（控制垂直位置）
-    // ry: 绕 Y 轴旋转（控制水平位置）
     const rx = (phi - Math.PI / 2) * (180 / Math.PI) // 转换为角度
     const ry = theta * (180 / Math.PI) // 转换为角度
     const rz = radius
