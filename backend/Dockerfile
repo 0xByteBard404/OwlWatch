@@ -56,8 +56,8 @@ RUN playwright install chromium
 # 复制应用代码
 COPY . .
 
-# 设置启动脚本权限
-RUN chmod +x /app/docker-entrypoint.sh
+# 修复换行符并设置启动脚本权限（Windows CRLF -> Linux LF）
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 # 暴露端口
 EXPOSE 8000
