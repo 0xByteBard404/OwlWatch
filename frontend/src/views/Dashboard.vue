@@ -340,7 +340,10 @@ const wordColors = [
 // 热词云暂停状态
 const cloudPaused = ref(false)
 
-// 计算词云数据 - 3D 球形均匀分布（热门词汇在赤道位置）
+// 黄金角度（斐波那契螺旋的数学基础）
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)) // ≈ 137.5°
+
+// 计算词云数据 - 斐波那契球面均匀分布（热门词汇在赤道位置）
 const wordCloudData = computed(() => {
   if (wordData.value.length === 0) return []
 
@@ -348,48 +351,24 @@ const wordCloudData = computed(() => {
   const minCount = Math.min(...wordData.value.map(w => w.count))
   const total = Math.min(wordData.value.length, 50)
 
-  // 按热度分组：热门(前1/3)在赤道，中等(中1/3)在温带，冷门(后1/3)在两极
-  const hotCount = Math.floor(total / 3)
-  const midCount = Math.floor(total / 3)
-
   return wordData.value.slice(0, total).map((word, index) => {
     // 根据频率计算字体大小 (10px - 26px)
     const sizeRange = 16
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
     const fontSize = 10 + normalizedSize * sizeRange
 
-    // 确定纬度区域
-    let latitudeRange: number
-    if (index < hotCount) {
-      // 热门词：赤道附近 ±15度
-      latitudeRange = Math.PI * 0.08
-    } else if (index < hotCount + midCount) {
-      // 中等词：温带 ±45度
-      latitudeRange = Math.PI * 0.25
-    } else {
-      // 冷门词：两极 ±72度
-      latitudeRange = Math.PI * 0.4
-    }
+    // 热门程度：0（最热）到 1（最冷）
+    const hotness = index / (total - 1 || 1)
 
-    // 在区域内均匀分布纬度
-    const indexInZone = index < hotCount
-      ? index
-      : index < hotCount + midCount
-        ? index - hotCount
-        : index - hotCount - midCount
-    const zoneSize = index < hotCount
-      ? hotCount
-      : index < hotCount + midCount
-        ? midCount
-        : total - hotCount - midCount
+    // 斐波那契球面分布 - 经度使用黄金角度递增，避免螺旋线
+    const theta = index * GOLDEN_ANGLE
 
-    // 纬度均匀分布，交替上下
-    const latitudeStep = latitudeRange * 2 / (zoneSize || 1)
-    const latitude = -latitudeRange + latitudeStep * indexInZone
+    // 纬度：热门词在赤道，冷门词在两极
+    // 使用 y 分布从 1（北极）到 -1（南极），热门词接近 0（赤道）
+    // hotness 越小（越热门），y 越接近 0
+    const maxLatitude = Math.PI * 0.4 // 最大纬度范围 ±72度
+    const latitude = maxLatitude * Math.pow(hotness, 0.6) * (index % 2 === 0 ? 1 : -1)
     const phi = Math.PI / 2 + latitude
-
-    // 经度均匀分布
-    const theta = (index / total) * Math.PI * 2
 
     const radius = 120
     const rx = (phi - Math.PI / 2) * (180 / Math.PI)
@@ -402,7 +381,7 @@ const wordCloudData = computed(() => {
       fontSize: Math.round(fontSize),
       color: wordColors[index % wordColors.length],
       rx: Math.round(rx),
-      ry: Math.round(ry),
+      ry: Math.round(ry) % 360, // 保持在 0-360 范围
       rz,
     }
   })
