@@ -340,10 +340,13 @@ const wordColors = [
 // 热词云暂停状态
 const cloudPaused = ref(false)
 
-// 黄金角度（斐波那契螺旋的数学基础）
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)) // ≈ 137.5°
+// 生成随机种子（基于字符串）的伪随机数
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
+  return x - Math.floor(x)
+}
 
-// 计算词云数据 - 斐波那契球面均匀分布（热门词汇在赤道位置）
+// 计算词云数据 - 随机参差分布（热门词汇在赤道位置）
 const wordCloudData = computed(() => {
   if (wordData.value.length === 0) return []
 
@@ -357,20 +360,24 @@ const wordCloudData = computed(() => {
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
     const fontSize = 10 + normalizedSize * sizeRange
 
+    // 使用词汇本身作为随机种子，确保每次渲染位置一致
+    const seed = word.word.charCodeAt(0) * 1000 + index
+
     // 热门程度：0（最热）到 1（最冷）
     const hotness = index / (total - 1 || 1)
 
-    // 斐波那契球面分布 - 经度使用黄金角度递增，避免螺旋线
-    const theta = index * GOLDEN_ANGLE
+    // 纬度：热门词在赤道附近，冷门词随机分布到两极
+    const maxLatitude = Math.PI * 0.42 // 最大 ±75度
+    const latitudeRange = maxLatitude * Math.pow(hotness, 0.6)
+    const randomLatitude = (seededRandom(seed) - 0.5) * 2 * latitudeRange
+    const phi = Math.PI / 2 + randomLatitude
 
-    // 纬度：热门词在赤道，冷门词在两极
-    // 使用 y 分布从 1（北极）到 -1（南极），热门词接近 0（赤道）
-    // hotness 越小（越热门），y 越接近 0
-    const maxLatitude = Math.PI * 0.4 // 最大纬度范围 ±72度
-    const latitude = maxLatitude * Math.pow(hotness, 0.6) * (index % 2 === 0 ? 1 : -1)
-    const phi = Math.PI / 2 + latitude
+    // 经度：完全随机分布，参差不齐
+    const theta = seededRandom(seed + 1) * Math.PI * 2
 
-    const radius = 120
+    // 半径：稍微随机变化，让层次感更强
+    const radius = 115 + seededRandom(seed + 2) * 15
+
     const rx = (phi - Math.PI / 2) * (180 / Math.PI)
     const ry = theta * (180 / Math.PI)
     const rz = radius
@@ -381,8 +388,8 @@ const wordCloudData = computed(() => {
       fontSize: Math.round(fontSize),
       color: wordColors[index % wordColors.length],
       rx: Math.round(rx),
-      ry: Math.round(ry) % 360, // 保持在 0-360 范围
-      rz,
+      ry: Math.round(ry),
+      rz: Math.round(rz),
     }
   })
 })
