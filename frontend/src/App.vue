@@ -116,7 +116,7 @@ onMounted(() => {
     </aside>
 
     <!-- Main Content -->
-    <div class="cyber-main">
+    <div class="cyber-main" :style="{ marginLeft: isCollapse ? '72px' : '220px' }">
       <!-- Header -->
       <header class="cyber-header">
         <div class="header-left">
@@ -208,7 +208,10 @@ onMounted(() => {
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
   z-index: 100;
   transition: width var(--transition-normal);
 }
@@ -390,6 +393,7 @@ onMounted(() => {
   min-width: 0;
   position: relative;
   z-index: 1;
+  transition: margin-left var(--transition-normal);
 }
 
 /* Header */
