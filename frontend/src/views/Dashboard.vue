@@ -346,28 +346,36 @@ const wordCloudData = computed(() => {
 
   const maxCount = Math.max(...wordData.value.map(w => w.count))
   const minCount = Math.min(...wordData.value.map(w => w.count))
-  const total = wordData.value.slice(0, 25).length
+  // 增加词汇数量到 50 个
+  const total = Math.min(wordData.value.length, 50)
 
-  return wordData.value.slice(0, 25).map((word, index) => {
-    // 根据频率计算字体大小 (12px - 32px)
-    const sizeRange = 20
+  return wordData.value.slice(0, total).map((word, index) => {
+    // 根据频率计算字体大小 (10px - 26px)
+    const sizeRange = 16
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
-    const fontSize = 12 + normalizedSize * sizeRange
+    const fontSize = 10 + normalizedSize * sizeRange
 
-    // 3D 球形分布 - 使用斐波那契球面分布
+    // 3D 球形分布 - 使用斐波那契球面分布算法
     const phi = Math.acos(-1 + (2 * index + 1) / total)
     const theta = Math.sqrt(total * Math.PI) * phi
     const radius = 120 // 球体半径
+
+    // 计算旋转角度用于球面贴图
+    // rx: 绕 X 轴旋转（控制垂直位置）
+    // ry: 绕 Y 轴旋转（控制水平位置）
+    const rx = (phi - Math.PI / 2) * (180 / Math.PI) // 转换为角度
+    const ry = theta * (180 / Math.PI) // 转换为角度
+    const rz = radius
 
     return {
       word: word.word,
       count: word.count,
       fontSize: Math.round(fontSize),
       color: wordColors[index % wordColors.length],
-      // 3D 坐标
-      x: Math.round(radius * Math.cos(theta) * Math.sin(phi)),
-      y: Math.round(radius * Math.sin(theta) * Math.sin(phi)),
-      z: Math.round(radius * Math.cos(phi)),
+      // 旋转角度和半径
+      rx: Math.round(rx),
+      ry: Math.round(ry),
+      rz: rz,
     }
   })
 })
@@ -516,9 +524,10 @@ onMounted(async () => {
                 :style="{
                   fontSize: word.fontSize + 'px',
                   color: word.color,
-                  textShadow: `0 0 10px ${word.color}, 0 0 20px ${word.color}40`,
-                  transform: `translate3d(${word.x}px, ${word.y}px, ${word.z}px)`,
-                  opacity: (word.z + 120) / 240 * 0.7 + 0.3,
+                  textShadow: `0 0 ${word.fontSize / 2}px ${word.color}`,
+                  '--rx': word.rx + 'deg',
+                  '--ry': word.ry + 'deg',
+                  '--rz': word.rz + 'px',
                 }"
                 @click="searchWord(word)"
               >
@@ -744,7 +753,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  perspective: 800px;
+  perspective: 600px;
+  perspective-origin: 50% 50%;
   overflow: hidden;
 }
 
@@ -754,15 +764,14 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transform-style: preserve-3d;
 }
 
 .cloud-sphere {
   position: relative;
-  width: 280px;
-  height: 280px;
+  width: 260px;
+  height: 260px;
   transform-style: preserve-3d;
-  animation: cloud-rotate 20s linear infinite;
+  animation: cloud-rotate 25s linear infinite;
 }
 
 .word-cloud-3d.paused .cloud-sphere {
@@ -771,10 +780,10 @@ onMounted(async () => {
 
 @keyframes cloud-rotate {
   from {
-    transform: rotateY(0deg) rotateX(10deg);
+    transform: rotateY(0deg) rotateX(-15deg);
   }
   to {
-    transform: rotateY(360deg) rotateX(10deg);
+    transform: rotateY(360deg) rotateX(-15deg);
   }
 }
 
@@ -786,14 +795,15 @@ onMounted(async () => {
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 0.3s ease;
   white-space: nowrap;
   transform-style: preserve-3d;
-  backface-visibility: visible;
+  /* 使用 rotateY + translateZ 实现球面贴图 */
+  transform: rotateY(var(--ry)) rotateX(var(--rx)) translateZ(var(--rz));
+  transition: transform 0.3s ease, text-shadow 0.3s ease;
 }
 
 .word-item-3d:hover {
-  transform: translate3d(var(--x), var(--y), var(--z)) scale(1.3) !important;
+  text-shadow: 0 0 20px currentColor, 0 0 40px currentColor !important;
   z-index: 100;
 }
 
