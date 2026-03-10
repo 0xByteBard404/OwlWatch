@@ -340,13 +340,7 @@ const wordColors = [
 // 热词云暂停状态
 const cloudPaused = ref(false)
 
-// 生成随机种子（基于字符串）的伪随机数
-const seededRandom = (seed: number) => {
-  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
-  return x - Math.floor(x)
-}
-
-// 计算词云数据 - 3D 球形分布（热门词汇在赤道位置，随机参差分布）
+// 计算词云数据 - 3D 球形均匀分布（热门词汇在赤道位置）
 const wordCloudData = computed(() => {
   if (wordData.value.length === 0) return []
 
@@ -354,32 +348,50 @@ const wordCloudData = computed(() => {
   const minCount = Math.min(...wordData.value.map(w => w.count))
   const total = Math.min(wordData.value.length, 50)
 
+  // 按热度分组：热门(前1/3)在赤道，中等(中1/3)在温带，冷门(后1/3)在两极
+  const hotCount = Math.floor(total / 3)
+  const midCount = Math.floor(total / 3)
+
   return wordData.value.slice(0, total).map((word, index) => {
     // 根据频率计算字体大小 (10px - 26px)
     const sizeRange = 16
     const normalizedSize = (word.count - minCount) / (maxCount - minCount || 1)
     const fontSize = 10 + normalizedSize * sizeRange
 
-    // 使用词汇本身作为随机种子，确保每次渲染位置一致
-    const seed = word.word.charCodeAt(0) * 1000 + index
+    // 确定纬度区域
+    let latitudeRange: number
+    if (index < hotCount) {
+      // 热门词：赤道附近 ±15度
+      latitudeRange = Math.PI * 0.08
+    } else if (index < hotCount + midCount) {
+      // 中等词：温带 ±45度
+      latitudeRange = Math.PI * 0.25
+    } else {
+      // 冷门词：两极 ±72度
+      latitudeRange = Math.PI * 0.4
+    }
 
-    // 热门程度：0（最热）到 1（最冷）
-    const hotness = index / (total - 1 || 1)
+    // 在区域内均匀分布纬度
+    const indexInZone = index < hotCount
+      ? index
+      : index < hotCount + midCount
+        ? index - hotCount
+        : index - hotCount - midCount
+    const zoneSize = index < hotCount
+      ? hotCount
+      : index < hotCount + midCount
+        ? midCount
+        : total - hotCount - midCount
 
-    // 纬度：热门词在赤道附近，冷门词随机分布到两极
-    // hotness 越小（越热门），纬度范围越小
-    const maxLatitude = Math.PI * 0.42 // 最大 ±75度
-    const latitudeRange = maxLatitude * Math.pow(hotness, 0.6)
-    const randomLatitude = (seededRandom(seed) - 0.5) * 2 * latitudeRange
-    const phi = Math.PI / 2 + randomLatitude
+    // 纬度均匀分布，交替上下
+    const latitudeStep = latitudeRange * 2 / (zoneSize || 1)
+    const latitude = -latitudeRange + latitudeStep * indexInZone
+    const phi = Math.PI / 2 + latitude
 
-    // 经度：完全随机分布，参差不齐
-    const theta = seededRandom(seed + 1) * Math.PI * 2
+    // 经度均匀分布
+    const theta = (index / total) * Math.PI * 2
 
-    // 半径：稍微随机变化，让层次感更强
-    const radius = 115 + seededRandom(seed + 2) * 15
-
-    // 计算旋转角度用于球面贴图
+    const radius = 120
     const rx = (phi - Math.PI / 2) * (180 / Math.PI)
     const ry = theta * (180 / Math.PI)
     const rz = radius
@@ -391,7 +403,7 @@ const wordCloudData = computed(() => {
       color: wordColors[index % wordColors.length],
       rx: Math.round(rx),
       ry: Math.round(ry),
-      rz: Math.round(rz),
+      rz,
     }
   })
 })
