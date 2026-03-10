@@ -379,24 +379,6 @@ DEFAULT_RSS_FEEDS = [
         "source_type": "zhihu",
         "fetch_interval": 300,
     },
-    {
-        "name": "B站热门视频",
-        "feed_url": "http://rsshub:1200/bilibili/ranking/0/3/1",
-        "source_type": "bilibili",
-        "fetch_interval": 600,
-    },
-    {
-        "name": "豆瓣-本周热门电影",
-        "feed_url": "http://rsshub:1200/douban/movie/weekly",
-        "source_type": "douban",
-        "fetch_interval": 3600,
-    },
-    {
-        "name": "抖音热点",
-        "feed_url": "http://rsshub:1200/douyin/trending",
-        "source_type": "douyin",
-        "fetch_interval": 300,
-    },
     # ========== 科技财经 ==========
     {
         "name": "36氪-快讯",
