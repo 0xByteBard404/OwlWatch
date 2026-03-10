@@ -825,8 +825,8 @@ onMounted(async () => {
   cursor: pointer;
   white-space: nowrap;
   transform-style: preserve-3d;
-  /* 使用 rotateY + translateZ 实现球面贴图 */
-  transform: rotateY(var(--ry)) rotateX(var(--rx)) translateZ(var(--rz));
+  /* CSS transform 从右到左执行：先 translateZ 移到球面，再 rotateY 设经度，最后 rotateX 设纬度 */
+  transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(var(--rz));
   transition: transform 0.3s ease, text-shadow 0.3s ease;
 }
 
