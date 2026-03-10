@@ -162,58 +162,49 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- Hero Section -->
-    <section class="hero-section" v-if="keyword">
-      <div class="hero-bg">
-        <div class="grid-overlay"></div>
-        <div class="glow-orb positive"></div>
-        <div class="glow-orb negative"></div>
+    <!-- Compact Hero Section - Horizontal Layout -->
+    <section class="hero-compact" v-if="keyword">
+      <div class="hero-left">
+        <div class="subject-badge">
+          <span class="badge-icon">◈</span>
+          <span class="badge-text">SUBJECT</span>
+        </div>
+        <h1 class="subject-name">{{ keyword.keyword }}</h1>
+        <span class="status-dot" :class="{ active: keyword.is_active }"></span>
+        <span class="subject-status">{{ keyword.is_active ? '运行中' : '已暂停' }}</span>
       </div>
 
-      <div class="hero-content">
-        <div class="subject-info">
-          <div class="subject-badge">
-            <span class="badge-icon">◈</span>
-            <span class="badge-text">SUBJECT</span>
-          </div>
-          <h1 class="subject-name">{{ keyword.keyword }}</h1>
-          <p class="subject-desc">
-            {{ keyword.is_active ? '监控运行中' : '监控已暂停' }} ·
-            优先级: {{ keyword.priority === 'high' ? '高' : keyword.priority === 'low' ? '低' : '中' }}
-          </p>
+      <div class="hero-divider"></div>
+
+      <div class="hero-stats">
+        <div class="stat-item positive">
+          <span class="stat-icon">▲</span>
+          <span class="stat-num">{{ stats.positive }}</span>
+          <span class="stat-label">正面</span>
         </div>
-
-        <div class="stats-row">
-          <div class="stat-card positive" :class="{ dominant: stats.positive > stats.negative }">
-            <div class="stat-value">{{ stats.positive }}</div>
-            <div class="stat-label">正面舆论</div>
-            <div class="stat-bar">
-              <div class="bar-fill" :style="{ width: stats.total > 0 ? (stats.positive / stats.total * 100) + '%' : '0%' }"></div>
-            </div>
-          </div>
-
-          <div class="stat-divider">
-            <div class="divider-line"></div>
-            <div class="divider-ratio">{{ positiveRatio }}%</div>
-            <div class="divider-label">正面占比</div>
-          </div>
-
-          <div class="stat-card negative" :class="{ dominant: stats.negative > stats.positive }">
-            <div class="stat-value">{{ stats.negative }}</div>
-            <div class="stat-label">负面舆论</div>
-            <div class="stat-bar">
-              <div class="bar-fill" :style="{ width: stats.total > 0 ? (stats.negative / stats.total * 100) + '%' : '0%' }"></div>
-            </div>
-          </div>
-
-          <div class="stat-card neutral">
-            <div class="stat-value">{{ stats.neutral }}</div>
-            <div class="stat-label">中性舆论</div>
-            <div class="stat-bar">
-              <div class="bar-fill" :style="{ width: stats.total > 0 ? (stats.neutral / stats.total * 100) + '%' : '0%' }"></div>
-            </div>
-          </div>
+        <div class="stat-item negative">
+          <span class="stat-icon">▼</span>
+          <span class="stat-num">{{ stats.negative }}</span>
+          <span class="stat-label">负面</span>
         </div>
+        <div class="stat-item neutral">
+          <span class="stat-icon">●</span>
+          <span class="stat-num">{{ stats.neutral }}</span>
+          <span class="stat-label">中性</span>
+        </div>
+      </div>
+
+      <div class="hero-divider"></div>
+
+      <div class="hero-ratio">
+        <div class="ratio-ring" :style="{ '--ratio': positiveRatio }">
+          <svg viewBox="0 0 36 36">
+            <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+            <path class="ring-fill" :stroke-dasharray="`${positiveRatio}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          </svg>
+          <span class="ratio-value">{{ positiveRatio }}%</span>
+        </div>
+        <span class="ratio-label">正面占比</span>
       </div>
     </section>
 
@@ -393,218 +384,192 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
-/* Hero Section */
-.hero-section {
-  position: relative;
-  padding: 48px;
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.05), rgba(255, 51, 102, 0.05));
+/* Compact Hero Section - Horizontal Layout */
+.hero-compact {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 28px;
+  background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  overflow: hidden;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.grid-overlay {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.glow-orb {
-  position: absolute;
-  width: 300px;
-  height: 300px;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
-}
-
-.glow-orb.positive {
-  top: -100px;
-  left: -100px;
-  background: var(--neon-green);
-}
-
-.glow-orb.negative {
-  bottom: -100px;
-  right: -100px;
-  background: var(--neon-red);
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.subject-info {
-  margin-bottom: 40px;
+.hero-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 .subject-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.3);
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--neon-orange);
-  border-radius: 20px;
-  margin-bottom: 16px;
+  border-radius: 12px;
 }
 
 .badge-icon {
   color: var(--neon-orange);
-  font-size: 0.9rem;
+  font-size: 0.75rem;
 }
 
 .badge-text {
   font-family: var(--font-display);
-  font-size: 0.65rem;
-  letter-spacing: 0.15em;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
   color: var(--neon-orange);
 }
 
 .subject-name {
   font-family: var(--font-display);
-  font-size: 2.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 8px 0;
+  margin: 0;
   letter-spacing: 0.02em;
 }
 
-.subject-desc {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-/* Stats Row */
-.stats-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr 1fr;
-  gap: 24px;
-  align-items: center;
-}
-
-.stat-card {
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.stat-card.positive {
-  border-color: rgba(0, 255, 136, 0.3);
-}
-
-.stat-card.positive.dominant {
-  background: rgba(0, 255, 136, 0.1);
-  box-shadow: 0 0 30px rgba(0, 255, 136, 0.2);
-}
-
-.stat-card.negative {
-  border-color: rgba(255, 51, 102, 0.3);
-}
-
-.stat-card.negative.dominant {
-  background: rgba(255, 51, 102, 0.1);
-  box-shadow: 0 0 30px rgba(255, 51, 102, 0.2);
-}
-
-.stat-card.neutral {
-  border-color: rgba(139, 149, 168, 0.3);
-}
-
-.stat-value {
-  font-family: var(--font-display);
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1;
-  margin-bottom: 8px;
-}
-
-.stat-card.positive .stat-value {
-  color: var(--neon-green);
-}
-
-.stat-card.negative .stat-value {
-  color: var(--neon-red);
-}
-
-.stat-label {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-
-.stat-bar {
-  height: 4px;
-  background: var(--bg-secondary);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 12px;
-}
-
-.stat-card.positive .bar-fill {
-  height: 100%;
-  background: var(--neon-green);
-  border-radius: 2px;
-  transition: width 0.6s ease;
-}
-
-.stat-card.negative .bar-fill {
-  height: 100%;
-  background: var(--neon-red);
-  border-radius: 2px;
-  transition: width 0.6s ease;
-}
-
-.stat-card.neutral .bar-fill {
-  height: 100%;
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--text-muted);
-  border-radius: 2px;
-  transition: width 0.6s ease;
 }
 
-.stat-divider {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 16px;
+.status-dot.active {
+  background: var(--neon-green);
+  box-shadow: 0 0 8px var(--neon-green);
+  animation: pulse 2s infinite;
 }
 
-.divider-line {
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.subject-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.hero-divider {
   width: 1px;
   height: 40px;
   background: linear-gradient(to bottom, transparent, var(--border-color), transparent);
-  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
-.divider-ratio {
+.hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex: 1;
+  justify-content: center;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-icon {
+  font-size: 0.7rem;
+}
+
+.stat-item.positive .stat-icon {
+  color: var(--neon-green);
+}
+
+.stat-item.negative .stat-icon {
+  color: var(--neon-red);
+}
+
+.stat-item.neutral .stat-icon {
+  color: var(--text-muted);
+}
+
+.stat-num {
   font-family: var(--font-display);
   font-size: 1.5rem;
+  font-weight: 700;
+  min-width: 32px;
+}
+
+.stat-item.positive .stat-num {
+  color: var(--neon-green);
+}
+
+.stat-item.negative .stat-num {
+  color: var(--neon-red);
+}
+
+.stat-item.neutral .stat-num {
+  color: var(--text-muted);
+}
+
+.stat-item .stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.hero-ratio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ratio-ring {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+
+.ratio-ring svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.ring-bg {
+  fill: none;
+  stroke: var(--bg-tertiary);
+  stroke-width: 3;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--neon-green);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+}
+
+.ratio-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--neon-green);
 }
 
-.divider-label {
-  font-size: 0.65rem;
+.ratio-label {
+  font-size: 0.6rem;
   color: var(--text-muted);
   letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 /* Content Section */
@@ -717,11 +682,12 @@ onMounted(() => {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-color);
   border-top: none;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  max-height: 600px;
+  max-height: calc(100vh - 280px);
+  min-height: 400px;
   overflow-y: auto;
 }
 
@@ -902,16 +868,27 @@ onMounted(() => {
 }
 
 @media (max-width: 900px) {
-  .stats-row {
-    grid-template-columns: 1fr 1fr 1fr;
+  .hero-compact {
+    flex-wrap: wrap;
     gap: 16px;
-    align-items: center;
+    padding: 16px 20px;
   }
-  .stat-divider {
-    grid-column: 1 / -1;
+  .hero-left {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .hero-divider {
+    display: none;
+  }
+  .hero-stats {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 24px;
+  }
+  .hero-ratio {
     flex-direction: row;
-    gap: 12px;
-    padding: 16px 0;
+    width: 100%;
+    justify-content: flex-start;
   }
   .three-column-layout {
     grid-template-columns: 1fr 1fr;
@@ -926,14 +903,21 @@ onMounted(() => {
 }
 
 @media (max-width: 600px) {
-  .hero-section {
-    padding: 24px;
+  .hero-compact {
+    padding: 14px 16px;
   }
   .subject-name {
-    font-size: 1.8rem;
+    font-size: 1.1rem;
   }
-  .stat-value {
-    font-size: 2rem;
+  .stat-num {
+    font-size: 1.2rem;
+  }
+  .ratio-ring {
+    width: 44px;
+    height: 44px;
+  }
+  .ratio-value {
+    font-size: 0.75rem;
   }
   .three-column-layout {
     grid-template-columns: 1fr;
