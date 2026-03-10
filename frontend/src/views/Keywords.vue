@@ -39,7 +39,7 @@ interface FormType extends KeywordCreate {
 const form = ref<FormType>({
   keyword: '',
   priority: 'medium',
-  platforms: ['bocha', 'tavily'],
+  platforms: [],
   data_sources: { rss_ids: [] },
   fetch_interval: 300,
   alert_config: JSON.parse(JSON.stringify(DEFAULT_ALERT_CONFIG)),
@@ -183,7 +183,7 @@ const handleCreate = () => {
   form.value = {
     keyword: '',
     priority: 'medium',
-    platforms: ['bocha', 'tavily'],
+    platforms: [],
     data_sources: { rss_ids: [] },
     fetch_interval: 300,
     alert_config: JSON.parse(JSON.stringify(DEFAULT_ALERT_CONFIG)),
